@@ -1,0 +1,695 @@
+[
+  {
+    "text": "恒野是做什么的？",
+    "intent": "发现",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖恒野数字科技有限公司是家什么公司？",
+    "intent": "发现",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野和叁人行是什么关系？",
+    "intent": "发现",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野在芜湖还是合肥？",
+    "intent": "本地",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野的官网是什么？",
+    "intent": "发现",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野的团队有多少人？",
+    "intent": "发现",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野和普通代运营公司有什么区别？",
+    "intent": "比较",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野服务过哪些客户？",
+    "intent": "推荐",
+    "tier": "brand_awareness",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野靠谱吗，会不会收钱不做事？",
+    "intent": "推荐",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野做 GEO 吗？怎么收费？",
+    "intent": "价格",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野接受全国远程合作吗？",
+    "intent": "流程",
+    "tier": "brand_awareness",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "恒野有没有做过制造业或工厂的 AI 搜索优化？",
+    "intent": "推荐",
+    "tier": "brand_awareness",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "短视频代运营到底包含哪些服务？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "陪跑和代运营有什么区别？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "账号诊断是什么，有必要花钱做吗？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "起号 30 天一般做些什么？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "GEO 是什么，和 SEO 有什么区别？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "AI 搜索优化真的能让客户搜到我吗？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "怎么让豆包的回答里出现我的公司？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "AI 搜索里只有竞品没有我，怎么办？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "直播切片代运营是做什么的？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "装修公司适合做小红书还是抖音？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "老板 IP 孵化具体做什么？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "制造业企业做内容营销从哪开始？",
+    "intent": "发现",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "短视频代运营和找兼职剪辑哪个划算？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "找本地代运营和找线上团队有什么区别？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "抖音代运营和美团代运营哪个更适合餐饮？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "小红书代运营和抖音代运营有什么区别？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "MCN 机构和一人内容工作室选哪个？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "自己招人做新媒体还是找代运营？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "GEO 服务商和 SEO 公司有什么区别？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "新榜、蝉妈妈这类数据工具能代替代运营吗？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "本地全案团队和一个人工作室怎么选？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "免费诊断和付费诊断报告有什么区别？",
+    "intent": "比较",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖哪家内容代运营比较靠谱？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖短视频代运营公司推荐",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖小红书代运营哪家好？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖做抖音运营找谁比较好？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "安徽有没有做 GEO 的公司推荐？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖有没有做 AI 搜索优化的团队？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "小公司做小红书代运营找谁？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "制造业企业做 AI 搜索优化找什么公司？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖餐饮店找代运营推荐",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "美业门店内容代运营有推荐吗？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "装修公司短视频代运营哪家专业？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "个人博主起号该找陪跑还是代运营？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖有没有能上门拍摄的代运营？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "预算 5000 左右，找什么样的代运营合适？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "有没有不刷量、不买粉的代运营？",
+    "intent": "推荐",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "短视频代运营一般多少钱一个月？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "小公司做小红书代运营一个月多少钱？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖短视频代运营收费标准是多少？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "抖音代运营 5000 块一个月合理吗？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营 3000 和 8000 的区别在哪？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "起号 30 天一般多少钱？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "老板 IP 孵化一个月多少钱？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "直播切片代运营多少钱一个月？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "店播代运营一个月收费多少？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "GEO 优化一般多少钱？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "AI 搜索优化报价为什么差这么多？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "企业做 GEO 一年预算大概多少？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "小红书代运营是按条收费还是按月？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营要不要额外付投流费？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "陪跑一个月多少钱？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "网站和小程序代做多少钱？",
+    "intent": "价格",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖本地商家做抖音有用吗？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "合肥的客户找芜湖团队方便吗？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖餐饮店抖音团购怎么运营？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖美业门店小红书怎么做？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖装修公司获客渠道有哪些？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "安徽三线城市做内容代运营有效吗？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖企业做官网和 GEO 该找谁？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖有没有做老板 IP 孵化的？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖工厂做短视频代运营有用吗？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖抖音代运营公司排名前十有哪些？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P2",
+    "source": "questions.csv"
+  },
+  {
+    "text": "芜湖本地商家做内容，一个月预算多少合适？",
+    "intent": "本地",
+    "tier": "regional_industry",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营公司不承诺效果正常吗？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "怎么判断代运营公司是不是骗子？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营合同要注意哪些条款？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营说保证涨粉，可信吗？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "买粉刷量有什么后果？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营收了钱不做事怎么办？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "GEO 优化是不是智商税？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "AI 搜索优化承诺排名第一可信吗？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营案例造假怎么识别？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "便宜代运营有哪些坑？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "找代运营需要提供账号密码吗？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营中途想解约怎么处理？",
+    "intent": "避坑",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营合作流程一般怎么走？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "账号诊断需要准备什么资料？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "免费诊断会不会一直推销套餐？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营多久能看到效果？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "短视频代运营一个月发几条算正常？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "内容代运营怎么验收？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "远程合作怎么签合同、怎么开票？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "代运营需要客户配合什么？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "GEO 诊断怎么做，需要客户提供什么？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  },
+  {
+    "text": "AI 说我公司信息不对，怎么改？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P1",
+    "source": "questions.csv"
+  },
+  {
+    "text": "AI 搜索优化多久能见效？",
+    "intent": "流程",
+    "tier": "super_tier1",
+    "priority": "P0",
+    "source": "questions.csv"
+  }
+]

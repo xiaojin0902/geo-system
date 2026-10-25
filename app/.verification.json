@@ -1,0 +1,27 @@
+{
+  "verified_at": "2026-10-26T03:00:56+08:00",
+  "tests": {
+    "cmd": "node --test",
+    "tests": 123,
+    "pass": 123,
+    "fail": 0
+  },
+  "pipeline": {
+    "init": "99 条种子题 + 品牌 hengye 入库（幂等）",
+    "diagnose_mock": "run #4 完成：12 题 / 8 有效 / 覆盖率 66.7% / 4.8 分 / 隐形 / data/reports/run-4.html",
+    "keywords": "99 个关键词，8 类簇",
+    "brief": "content #2 · data/briefs/hengye-1.md",
+    "write": "模板模式 996 字 · 事实核查 0 违规 · 状态 draft · data/drafts/2.md",
+    "publish": "publication #2 · 知乎专栏 · published（演示 URL）",
+    "monitor": "run #6（6 题）与 #5 对比：样本不足不出分；monitor 后自动重建 index.html（含 run-1..run-6）",
+    "report": "run-3/run-4 报告 + index.html 重建，DEMO 横幅在，0 外链，0 OmniRank 字样"
+  },
+  "live_mode": "未配置 API Key：diagnose --engines live 会明确报错并建议 --engines mock（已验证）",
+  "artifacts": [
+    "data/geo.db",
+    "data/reports/",
+    "data/briefs/",
+    "data/drafts/"
+  ],
+  "notes": "demo 数据仅验证管线，不可作为真实 AI 回答结论；真实基线需在 app/.env 填 DEEPSEEK_API_KEY 或 DASHSCOPE_API_KEY 后跑 --engines live；monitor 自动刷新运行列表（123 条测试覆盖）"
+}
