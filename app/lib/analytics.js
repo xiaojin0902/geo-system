@@ -114,7 +114,12 @@ export function matchBrand(text, brand = {}) {
 export function domainOf(url) {
   try {
     const { hostname } = new URL(String(url ?? '').trim());
-    return hostname.toLowerCase().replace(/^www\./u, '');
+    const clean = hostname.toLowerCase().replace(/^www\./u, '');
+    // 真实数据里出现过被拼接坏的 hostname（形如 `hengyecangchu.xn--com*(...`）：
+    // 它既不是合法域名，也不该出现在引用源排行里，直接丢弃比渲染成乱码好。
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/u.test(clean)) return '';
+    if (clean.length > 253) return '';
+    return clean;
   } catch {
     return '';
   }
