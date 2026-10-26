@@ -228,7 +228,31 @@ function engineStatus() {
   }));
 }
 
-async function handle(req, res, slug) {
+/**
+ * Basic Auth：线上部署时默认开启（未配 BASIC_USER 则不启用，保持本地零门槛）。
+ * 为什么不用第三方登录：自用/客户演示场景下，一个账号密码就够，且不引入外部依赖与账号体系。
+ */
+function checkAuth(req, auth) {
+  if (!auth || !auth.user) return true;
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Basic ')) return false;
+  try {
+    const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+    const index = decoded.indexOf(':');
+    const user = index >= 0 ? decoded.slice(0, index) : decoded;
+    const pass = index >= 0 ? decoded.slice(index + 1) : '';
+    return user === auth.user && pass === auth.pass;
+  } catch {
+    return false;
+  }
+}
+
+async function handle(req, res, slug, auth = null) {
+  if (!checkAuth(req, auth)) {
+    res.writeHead(401, { 'www-authenticate': 'Basic realm="Hengye GEO", charset="UTF-8"' });
+    res.end('需要登录');
+    return;
+  }
   const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
   const pathname = decodeURIComponent(url.pathname);
 
@@ -554,9 +578,9 @@ async function handle(req, res, slug) {
  * @param {string} [options.brand] 品牌 slug
  * @returns {Promise<{url:string, port:number, close:()=>Promise<void>, server:http.Server}>}
  */
-export async function startServer({ port = 8787, host = '127.0.0.1', brand = 'hengye' } = {}) {
+export async function startServer({ port = 8787, host = '127.0.0.1', brand = 'hengye', auth = null } = {}) {
   const server = http.createServer((req, res) => {
-    handle(req, res, brand).catch((error) => {
+    handle(req, res, brand, auth).catch((error) => {
       if (res.headersSent) {
         res.end();
         return;
