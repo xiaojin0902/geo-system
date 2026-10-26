@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { APP_ROOT, DATA_DIR, brandPath, dbPath, loadEnv } from '../lib/config.js';
 import { openStore } from '../lib/store.js';
@@ -42,6 +42,11 @@ ${systemEdition()} · 命令行（node bin/geo.js）
   client     开通/续费客户订阅（自助版 / 托管版）
   agent      代理管理：开通代理、分配客户、查看分成
   bill       托管结算单：按效果计量（新增提及/引用/提及率/推荐次数）
+  media      信源库：23 个渠道的类型/成本/发布方式（可筛选与估算）
+  watch      7×24 巡检：配置频率、立即巡检、查看历史、生成调度配置
+  apikey     开放 API 密钥：创建/查看/吊销（客户系统对接）
+  retract    撤回发布：登记撤回原因（可追溯/可撤回）
+  facts      事实主数据：登记/查看关键事实（抗幻觉），内容只能引用已核验事实
   alerts     异动告警：本期 vs 上期，谁掉了/谁涨了（可推送 webhook）
   attribution 内容归因：我们发的哪篇文章被 AI 引用了
   compare    竞品对位：同一个问题 AI 提了谁
@@ -82,6 +87,8 @@ ${systemEdition()} · 命令行（node bin/geo.js）
   node bin/geo.js agent --add --username 代理 --password 密码 --name 名称 --quota 5000
   node bin/geo.js agent --list | --report --username 代理
   node bin/geo.js bill --brand <客户> [--month 2026-10] [--baseline-run <id>] [--json]
+  node bin/geo.js facts --brand <客户> [--add --key legal_name --value "…" --source https://… --owner 责任人 --valid-days 365]
+  node bin/geo.js facts --brand <客户> --list | --health
   node bin/geo.js alerts --brand <客户> [--run <id>] [--push <webhook>] [--json]
   node bin/geo.js attribution --brand <客户> [--json]
   node bin/geo.js compare --brand <客户> [--json]
@@ -1254,7 +1261,12 @@ async function cmdPublish(flags) {
       };
     }
 
-    const publicationId = store.createPublication({ contentId, channel, url, status });
+    const account = stringFlag(flags.account, 'account') ?? null;
+    const factKeys = (stringFlag(flags.facts, 'facts') ?? '')
+      .split(',')
+      .map((key) => key.trim())
+      .filter(Boolean);
+    const publicationId = store.createPublication({ contentId, channel, url, status, account, factKeys });
     store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'publish', detail: `content=${contentId} channel=${channel} status=${status}` });
     store.updateContentStatus(contentId, status === 'published' ? 'published' : 'dry_run');
     const payload = {
@@ -1478,6 +1490,35 @@ function compareWithPrevious(previousDetail, detail) {
   return changes;
 }
 
+/** 用本机 Chrome/Chromium 把 HTML 打成 PDF（零依赖；找不到浏览器就明确提示，不假装成功）。 */
+function printHtmlToPdf(htmlPath, pdfPath) {
+  const candidates = [
+    process.env.CHROME_PATH,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].filter(Boolean);
+  const chrome = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!chrome) {
+    return { ok: false, reason: '本机没有找到 Chrome/Chromium，无法直接生成 PDF（可用 CHROME_PATH 指定）', pdfPath };
+  }
+  try {
+    execFileSync(chrome, [
+      '--headless=new',
+      '--disable-gpu',
+      '--no-sandbox',
+      '--no-pdf-header-footer',
+      `--print-to-pdf=${pdfPath}`,
+      `file://${htmlPath}`,
+    ], { stdio: 'ignore', timeout: 60000 });
+    return fs.existsSync(pdfPath) ? { ok: true, pdfPath } : { ok: false, reason: 'PDF 未生成', pdfPath };
+  } catch (error) {
+    return { ok: false, reason: String(error?.message ?? error), pdfPath };
+  }
+}
+
 /** report：按已有 run 重建报告（评分缺失时按规则重算并回填）。 */
 async function cmdReport(flags) {
   const runId = intFlag(flags.run, 'run', undefined);
@@ -1535,6 +1576,18 @@ async function cmdReport(flags) {
     console.log(`  报告：${files.mdPath}`);
     console.log(`        ${files.htmlPath}`);
     if (indexPath) console.log(`  列表：${indexPath}`);
+    if (flags.pdf) {
+      const pdfPath = files.htmlPath.replace(/\.html$/u, '.pdf');
+      const pdf = printHtmlToPdf(files.htmlPath, pdfPath);
+      if (pdf.ok) {
+        payload.reportPdf = pdf.pdfPath;
+        console.log(`  PDF：${pdf.pdfPath}`);
+      } else {
+        console.log(`
+PDF 未生成：${pdf.reason}`);
+        console.log('可用浏览器打开 HTML 后「打印 → 存为 PDF」，或设 CHROME_PATH 指向本机 Chrome。');
+      }
+    }
     if (detail.run.kind === 'demo') console.log('  提示：这是 DEMO 演示数据的报告，不能当作真实 AI 回答结论。');
     return 0;
   });
@@ -2982,6 +3035,251 @@ async function cmdCompare(flags) {
   });
 }
 
+
+/** 事实主数据：登记 / 列表 / 健康检查。内容与报告只能引用已核验事实。 */
+async function cmdFacts(flags) {
+  const slug = brandSlug(flags);
+  const factsMod = await import('../lib/facts.js');
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+
+    if (flags.add) {
+      const key = stringFlag(flags.key, 'key');
+      const value = stringFlag(flags.value, 'value');
+      if (!key || !value) {
+        throw new CliError('缺少 --key / --value', [
+          '用法：node bin/geo.js facts --brand hengye --add --key legal_name --value "芜湖恒野数字科技有限公司" --source https://... --owner 金XX --valid-days 365',
+          `可用字段：${factsMod.FACT_KEYS.map((k) => k.key).join('、')}`,
+        ]);
+      }
+      const days = intFlag(flags['valid-days'] ?? flags.validDays, 'valid-days', 365);
+      const validUntil = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
+      const fact = store.upsertFact({
+        brandId: brand.id,
+        key,
+        value,
+        sourceUrl: stringFlag(flags.source, 'source') ?? null,
+        sourceType: stringFlag(flags['source-type'] ?? flags.sourceType, 'source-type') ?? 'official',
+        owner: stringFlag(flags.owner, 'owner') ?? null,
+        validUntil,
+        status: stringFlag(flags.status, 'status') ?? 'verified',
+      });
+      store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'fact_upsert', detail: `${key}=${String(value).slice(0, 30)}` });
+      if (flags.json) {
+        console.log(JSON.stringify(fact, null, 2));
+        return 0;
+      }
+      console.log(`✔ 事实已登记：${factsMod.keyMeta(key)?.label ?? key} = ${value}`);
+      console.log(`  来源：${fact.sourceUrl ?? '（缺来源，内容生成时不可用）'} · 责任人：${fact.owner ?? '—'} · 有效期：${fact.validUntil ? fact.validUntil.slice(0, 10) : '长期'}`);
+      return 0;
+    }
+
+    const facts = store.listFacts(brand.id);
+    if (flags.json) {
+      console.log(JSON.stringify({ facts, health: factsMod.factHealth(facts) }, null, 2));
+      return 0;
+    }
+    if (flags.health || !flags.list) {
+      console.log(factsMod.renderFactsMarkdown(facts));
+      return 0;
+    }
+    console.log(factsMod.renderFactsMarkdown(facts));
+    return 0;
+  });
+}
+
+
+/** 撤回发布：登记原因，保留审计痕迹（不物理删除）。 */
+async function cmdRetract(flags) {
+  const id = intFlag(flags.publication, 'publication', undefined);
+  if (id === undefined) {
+    throw new CliError('缺少 --publication <发布记录 id>', [
+      '先查发布记录：node bin/geo.js publish --list',
+      '撤回：node bin/geo.js retract --publication 3 --reason "价格已变更"',
+    ]);
+  }
+  const reason = stringFlag(flags.reason, 'reason') ?? '';
+  if (!reason) throw new CliError('缺少 --reason（撤回必须留原因）');
+  return withStore(async (store) => {
+    const ok = store.withdrawPublication(id, reason);
+    store.writeAudit({ actor: 'cli', action: 'publish_withdraw', detail: `publication=${id} reason=${reason}` });
+    if (!ok) {
+      console.log(`发布记录 #${id} 不存在，或已经撤回过了。`);
+      return 1;
+    }
+    console.log(`✔ 已撤回发布记录 #${id}：${reason}`);
+    console.log('提示：撤回只登记在系统里，请同步到对应平台下架/更正。');
+    return 0;
+  });
+}
+
+
+/** 开放 API 密钥：创建（明文只显示一次）/ 列表 / 吊销。 */
+async function cmdApiKey(flags) {
+  const keysMod = await import('../lib/api-keys.js');
+  return withStore(async (store) => {
+    if (flags.revoke) {
+      const id = intFlag(flags.revoke, 'revoke', undefined);
+      if (id === undefined) throw new CliError('缺少 --revoke <id>');
+      const ok = store.revokeApiKey(id);
+      store.writeAudit({ actor: 'cli', action: 'apikey_revoke', detail: `id=${id}` });
+      console.log(ok ? `✔ 已吊销密钥 #${id}` : `密钥 #${id} 不存在`);
+      return ok ? 0 : 1;
+    }
+
+    if (!flags.create) {
+      const keys = store.listApiKeys();
+      if (flags.json) {
+        console.log(JSON.stringify(keys, null, 2));
+        return 0;
+      }
+      if (!keys.length) {
+        console.log('还没有 API 密钥。创建：node bin/geo.js apikey --create --name 客户A --brand <slug>');
+        return 0;
+      }
+      printTable(
+        ['ID', '名称', '前缀', '品牌', '权限', '创建', '最近使用', '状态'],
+        keys.map((key) => [
+          String(key.id), key.name, key.prefix, key.brandSlug ?? '全部', key.scopes.join('/'),
+          String(key.createdAt).slice(0, 10), key.lastUsedAt ? String(key.lastUsedAt).slice(0, 10) : '—',
+          key.revoked ? '已吊销' : '有效',
+        ]),
+      );
+      return 0;
+    }
+
+    const name = stringFlag(flags.name, 'name') ?? '未命名';
+    const brandSlug = stringFlag(flags.brand, 'brand') ?? brandSlugOf(flags);
+    const scopes = (stringFlag(flags.scopes, 'scopes') ?? 'read').split(',').map((x) => x.trim()).filter(Boolean);
+    for (const scope of scopes) {
+      if (!keysMod.API_SCOPES.includes(scope)) throw new CliError(`未知权限「${scope}」`, [`可用：${keysMod.API_SCOPES.join('、')}`]);
+    }
+    const brand = brandSlug ? requireBrand(store, brandSlug) : null;
+    const generated = keysMod.generateApiKey();
+    const id = store.createApiKey({ name, prefix: generated.prefix, keyHash: generated.hash, brandSlug: brand?.slug ?? null, scopes });
+    store.writeAudit({ actor: 'cli', action: 'apikey_create', detail: `${name} brand=${brand?.slug ?? 'all'} scopes=${scopes.join(',')}` });
+    if (flags.json) {
+      console.log(JSON.stringify({ id, key: generated.key, prefix: generated.prefix, scopes, brandSlug: brand?.slug ?? null }, null, 2));
+      return 0;
+    }
+    console.log('✔ API 密钥已创建（明文只显示这一次，请立即保存）');
+    console.log(`  ID：${id} · 名称：${name} · 品牌：${brand?.slug ?? '全部'} · 权限：${scopes.join('/')}`);
+    console.log(`  密钥：${generated.key}`);
+    console.log('');
+    console.log('调用示例：');
+    console.log(`  curl -H "Authorization: Bearer ${generated.key.slice(0, 12)}…" http://127.0.0.1:8787/api/v1/state`);
+    return 0;
+  });
+}
+
+
+/** 7×24 巡检：配置 / 立即跑一次 / 状态 / 生成调度配置。 */
+async function cmdWatch(flags) {
+  const slug = brandSlug(flags);
+  const watchMod = await import('../lib/watch.js');
+  const paths = watchMod.watchPaths(APP_ROOT);
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+    const settings = store.listSettings(brand.id);
+    const config = watchMod.watchConfig(settings);
+
+    if (flags.configure) {
+      const interval = intFlag(flags.interval, 'interval', config.intervalMinutes);
+      const engines = stringFlag(flags.engines, 'engines') ?? config.engines;
+      const limit = intFlag(flags.limit, 'limit', config.limit);
+      const enable = flags.enable ? true : flags.disable ? false : true;
+      store.setSetting('watch_enabled', enable ? '1' : '0', brand.id);
+      store.setSetting('watch_interval_minutes', String(interval), brand.id);
+      store.setSetting('watch_engines', engines, brand.id);
+      store.setSetting('watch_limit', String(limit), brand.id);
+      store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'watch_configure', detail: `interval=${interval} engines=${engines} limit=${limit} enabled=${enable}` });
+      console.log(`✔ 巡检配置已更新：${enable ? '启用' : '停用'} · 每 ${interval} 分钟 · ${engines} · ${limit} 题`);
+      return 0;
+    }
+
+    if (flags.run) {
+      if (!config.enabled) {
+        throw new CliError('巡检未启用', [`先启用：node bin/geo.js watch --brand ${slug} --configure --interval 60 --enable`]);
+      }
+      const watchRunId = store.startWatchRun({ brandSlug: slug, detail: `${config.engines}/${config.limit}` });
+      console.log(`开始巡检（run 记录 #${watchRunId}）…`);
+      const result = await watchMod.runWatchOnce({
+        brand: slug,
+        config,
+        appRoot: APP_ROOT,
+        cliPath: paths.cliPath,
+        onStart: () => watchRunId,
+        onFinish: (id, info) => {
+          if (id !== null) store.finishWatchRun(id, info);
+        },
+      });
+      store.setSetting('watch_last_run_at', new Date().toISOString(), brand.id);
+      if (flags.json) {
+        console.log(JSON.stringify({ result, watchRunId }, null, 2));
+        return result.ok ? 0 : 1;
+      }
+      console.log(result.ok ? `✔ 巡检完成：${result.detail}` : `✖ 巡检失败：${result.detail}`);
+      return result.ok ? 0 : 1;
+    }
+
+    if (flags.install) {
+      const lines = watchMod.cronLines({
+        brand: slug,
+        intervalMinutes: config.intervalMinutes,
+        appRoot: APP_ROOT,
+        nodeBin: process.execPath,
+        cliPath: paths.cliPath,
+        logFile: paths.logFile,
+      });
+      console.log(lines.join('\n'));
+      console.log('');
+      console.log('把上面带 cron 表达式的一行复制到 `crontab -e`，或用 launchd/systemd 触发同一条命令。');
+      return 0;
+    }
+
+    // 默认：状态
+    const history = store.listWatchRuns({ brandSlug: slug, limit: 20 });
+    if (flags.json) {
+      console.log(JSON.stringify({ config, history }, null, 2));
+      return 0;
+    }
+    console.log(watchMod.renderWatchStatus({ config, history, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+    if (!config.enabled) {
+      console.log('提示：启用巡检 → node bin/geo.js watch --brand ' + slug + ' --configure --interval 60 --enable');
+    }
+    return 0;
+  });
+}
+
+
+/** 信源库：按类型/关键词筛选渠道，估算投放成本。 */
+async function cmdMedia(flags) {
+  let mediaMod;
+  try {
+    mediaMod = await import('../lib/media-catalog.js');
+  } catch (error) {
+    throw new CliError('信源库模块不可用（lib/media-catalog.js）', [`详情：${error?.message ?? error}`]);
+  }
+  const list = mediaMod.listMedia({ type: stringFlag(flags.type, 'type') ?? '', search: stringFlag(flags.search, 'search') ?? '', env: process.env });
+  const withReady = list.map((media) => ({ ...media, readiness: mediaMod.mediaReadiness(media, process.env) }));
+  const count = intFlag(flags.count, 'count', 1);
+  const cost = mediaMod.estimateCost(list, { count });
+  if (flags.json) {
+    console.log(JSON.stringify({ total: list.length, cost, media: withReady }, null, 2));
+    return 0;
+  }
+  console.log(mediaMod.renderMediaTable(list));
+  console.log('');
+  console.log(`按每渠道 ${count} 篇估算：¥${cost.totalMin}–${cost.totalMax}${cost.mixed ? '（含 0 元渠道）' : ''}`);
+  const notReady = withReady.filter((media) => !media.readiness.ready);
+  if (notReady.length) {
+    console.log('');
+    console.log('未就绪渠道（缺配置）：');
+    for (const media of notReady.slice(0, 8)) console.log(`  - ${media.name}：${media.readiness.reason}`);
+  }
+  return 0;
+}
+
 // ---------------------------------------------------- doctor / audit / serve
 // 这三个命令解决的是「装完之后怎么用起来」，不是采集主链路，因此单独成段。
 
@@ -3157,6 +3455,11 @@ const HANDLERS = {
   client: cmdClient,
   agent: cmdAgent,
   bill: cmdBill,
+  media: cmdMedia,
+  watch: cmdWatch,
+  apikey: cmdApiKey,
+  retract: cmdRetract,
+  facts: cmdFacts,
   alerts: cmdAlerts,
   attribution: cmdAttribution,
   compare: cmdCompare,

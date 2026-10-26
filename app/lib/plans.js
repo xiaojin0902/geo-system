@@ -30,6 +30,7 @@ export const PLANS = Object.freeze([
     name: '基础版',
     priceMonthly: 299,
     quotaQuestions: 120,
+    seats: 2,
     features: ['单品牌', '4 个引擎', '月度周报', '分享链接'],
     modes: ['self_service', 'managed'],
   },
@@ -38,6 +39,7 @@ export const PLANS = Object.freeze([
     name: '专业版',
     priceMonthly: 699,
     quotaQuestions: 400,
+    seats: 5,
     features: ['单品牌', '13 个引擎', '周报+月报', '分享链接', '内容矩阵分发'],
     modes: ['self_service', 'managed'],
   },
@@ -46,6 +48,7 @@ export const PLANS = Object.freeze([
     name: '服务商版',
     priceMonthly: 1999,
     quotaQuestions: 1500,
+    seats: 20,
     features: ['多品牌', '13 个引擎', '白标', 'API', '全部功能'],
     modes: ['self_service', 'managed'],
   },
@@ -69,6 +72,7 @@ export function resolveSubscription(settings = {}, { now = Date.now() } = {}) {
   const mode = modeOf(settings.service_mode);
   const quotaRaw = Number(settings.quota_questions);
   const quota = Number.isFinite(quotaRaw) && quotaRaw >= 0 ? quotaRaw : (plan ? plan.quotaQuestions : 0);
+  const seats = plan ? plan.seats : 1;
   const expireAt = String(settings.expire_at ?? '').trim() || null;
   const expired = expireAt ? new Date(expireAt).getTime() < now : false;
   return {
@@ -78,6 +82,7 @@ export function resolveSubscription(settings = {}, { now = Date.now() } = {}) {
     mode: mode.id,
     modeName: mode.name,
     quotaQuestions: quota,
+    seats,
     expireAt,
     expired,
     active: Boolean(plan) && !expired,

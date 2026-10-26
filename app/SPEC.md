@@ -492,6 +492,16 @@ CLI：`geo agent --add/--list/--report`、`geo client ... --agent <代理>`。
 - `lib/compare.js`：按问题级别判断本品牌/竞品是否被提，输出胜率、缺口（竞品独占）、优势问题。
 - 页面 `/alerts` `/attribution` `/compare`；CLI `geo alerts|attribution|compare`；告警支持 `--push` 或 `ALERT_WEBHOOK`。
 
+## 3.39 合规与交付全面升级（2026-10-27 追加）
+
+- `lib/facts.js` + `facts` 表：事实主数据（key/value/source/owner/valid_until/status），`isUsable`/`factHealth`/`contentGate`/`renderFactsForPrompt`；页面 `/facts`，CLI `geo facts`。
+- `lib/publish-track.js` + `publications` 扩展（account/fact_keys_json/withdrawn_at/withdraw_reason）：`trackRisks`/`buildTrackReport`；CLI `geo retract`，publish 支持 `--account`/`--facts`。
+- `lib/watch.js` + `watch_runs` 表：配置夹取、`nextRunAt`/`isDue`、`cronLines`（5 段修正）、`runWatchOnce`；页面 `/watch`，CLI `geo watch`。
+- `lib/api-keys.js` + `api_keys` 表：`generateApiKey`（只存 sha256）、作用域 read/share/write、吊销；`/api/v1/*`（me/state/runs/insights/alerts/attribution/compare/share）带 Bearer 鉴权与 120 次/分钟限流；CLI `geo apikey`。
+- `lib/media-catalog.js`：23 渠道 8 类型，`listMedia`/`mediaReadiness`/`estimateCost`/`renderMediaTable`；CLI `geo media`。
+- `lib/i18n.js`：4 locale、54 词条、`t`/`formatNumber`/`formatPercent`/`questionPromptTemplate`/`translateVerdict`/`localeReportTitle`。
+- 套餐 `seats`（2/5/20）+ `/api/users` 席位校验；`geo report --pdf` 经本机 Chrome 输出 PDF。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

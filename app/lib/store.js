@@ -190,6 +190,46 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
 
+-- 巡检运行历史：7×24 巡检的每次执行记录
+CREATE TABLE IF NOT EXISTS watch_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_slug TEXT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  status TEXT NOT NULL DEFAULT 'running',
+  detail TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_watch_started ON watch_runs(started_at);
+
+-- 开放 API 密钥：客户系统对接用（只存哈希，明文只显示一次）
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  prefix TEXT NOT NULL,
+  key_hash TEXT NOT NULL UNIQUE,
+  brand_slug TEXT,
+  scopes_json TEXT,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT,
+  revoked INTEGER NOT NULL DEFAULT 0
+);
+
+-- 事实主数据：内容与报告只能引用这里登记过的事实（抗幻觉的底座）
+CREATE TABLE IF NOT EXISTS facts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  source_url TEXT,
+  source_type TEXT,
+  owner TEXT,
+  valid_until TEXT,
+  status TEXT NOT NULL DEFAULT 'verified',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(brand_id, key)
+);
+
 -- 分享链接：给客户看的只读报告（token 即凭证，可设到期时间与吊销）
 CREATE TABLE IF NOT EXISTS shares (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -397,6 +437,11 @@ export class Store {
     addColumn('brands', 'disambiguation_json', 'disambiguation_json TEXT');
     addColumn('brands', 'same_name_hints_json', 'same_name_hints_json TEXT');
     addColumn('brands', 'agent', 'agent TEXT');
+    addColumn('publications', 'account', 'account TEXT');
+    addColumn('publications', 'fact_keys_json', 'fact_keys_json TEXT');
+    addColumn('publications', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+    addColumn('publications', 'withdrawn_at', 'withdrawn_at TEXT');
+    addColumn('publications', 'withdraw_reason', 'withdraw_reason TEXT');
   }
 
   close() {
@@ -802,7 +847,8 @@ export class Store {
   /** 某品牌全部发布记录（含内容标题，供分发矩阵页使用） */
   listPublications(brandId) {
     return this.#stmt(
-      `SELECT p.id, p.content_id, p.channel, p.url, p.status, p.created_at, c.title
+      `SELECT p.id, p.content_id, p.channel, p.url, p.status, p.created_at, p.account,
+              p.fact_keys_json, p.withdrawn_at, p.withdraw_reason, c.title
          FROM publications p
          JOIN contents c ON c.id = p.content_id
         WHERE c.brand_id = ?
@@ -814,6 +860,10 @@ export class Store {
       url: row.url,
       status: row.status,
       createdAt: row.created_at,
+      account: row.account,
+      factKeys: parseJson(row.fact_keys_json, []),
+      withdrawnAt: row.withdrawn_at,
+      withdrawReason: row.withdraw_reason,
       title: row.title,
     }));
   }
@@ -929,6 +979,141 @@ export class Store {
   /** 列某代理名下的客户 */
   listBrandsByAgent(agent) {
     return this.#stmt('SELECT * FROM brands WHERE agent = ? ORDER BY id').all(String(agent)).map(mapBrand);
+  }
+
+  // ----------------------------------------------------------- watch（巡检）
+
+  startWatchRun({ brandSlug, detail = '' } = {}) {
+    const result = this.#stmt('INSERT INTO watch_runs (brand_slug, started_at, status, detail) VALUES (?,?,?,?)').run(
+      String(brandSlug ?? ''),
+      nowIso(),
+      'running',
+      String(detail ?? ''),
+    );
+    return Number(result.lastInsertRowid);
+  }
+
+  finishWatchRun(id, { status = 'done', detail = '' } = {}) {
+    return this.#stmt('UPDATE watch_runs SET finished_at = ?, status = ?, detail = ? WHERE id = ?').run(nowIso(), status, String(detail ?? ''), Number(id)).changes > 0;
+  }
+
+  listWatchRuns({ brandSlug = null, limit = 30 } = {}) {
+    const rows = brandSlug
+      ? this.#stmt('SELECT * FROM watch_runs WHERE brand_slug = ? ORDER BY id DESC LIMIT ?').all(String(brandSlug), Number(limit))
+      : this.#stmt('SELECT * FROM watch_runs ORDER BY id DESC LIMIT ?').all(Number(limit));
+    return rows.map((row) => ({
+      id: Number(row.id),
+      brandSlug: row.brand_slug,
+      startedAt: row.started_at,
+      finishedAt: row.finished_at,
+      status: row.status,
+      detail: row.detail,
+    }));
+  }
+
+  // ----------------------------------------------------------- api keys
+
+  createApiKey({ name, prefix, keyHash, brandSlug = null, scopes = ['read'] } = {}) {
+    const ts = nowIso();
+    const result = this.#stmt(
+      'INSERT INTO api_keys (name, prefix, key_hash, brand_slug, scopes_json, created_at, revoked) VALUES (?,?,?,?,?,?,0)',
+    ).run(String(name ?? 'key'), String(prefix), String(keyHash), brandSlug, JSON.stringify(scopes), ts);
+    return Number(result.lastInsertRowid);
+  }
+
+  getApiKeyByHash(keyHash) {
+    const row = this.#stmt('SELECT * FROM api_keys WHERE key_hash = ? AND revoked = 0').get(String(keyHash ?? ''));
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      name: row.name,
+      prefix: row.prefix,
+      brandSlug: row.brand_slug,
+      scopes: parseJson(row.scopes_json, ['read']),
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at,
+      revoked: Number(row.revoked) === 1,
+    };
+  }
+
+  touchApiKey(id) {
+    this.#stmt('UPDATE api_keys SET last_used_at = ? WHERE id = ?').run(nowIso(), Number(id));
+  }
+
+  listApiKeys(brandSlug = null) {
+    const rows = brandSlug
+      ? this.#stmt('SELECT * FROM api_keys WHERE brand_slug = ? ORDER BY id DESC').all(String(brandSlug))
+      : this.#stmt('SELECT * FROM api_keys ORDER BY id DESC').all();
+    return rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      prefix: row.prefix,
+      brandSlug: row.brand_slug,
+      scopes: parseJson(row.scopes_json, []),
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at,
+      revoked: Number(row.revoked) === 1,
+    }));
+  }
+
+  revokeApiKey(id) {
+    return this.#stmt('UPDATE api_keys SET revoked = 1 WHERE id = ?').run(Number(id)).changes > 0;
+  }
+
+  // ----------------------------------------------------------- facts（事实主数据）
+
+  upsertFact({ brandId, key, value, sourceUrl = null, sourceType = 'official', owner = null, validUntil = null, status = 'verified' } = {}) {
+    const k = String(key ?? '').trim();
+    const v = String(value ?? '').trim();
+    if (!k) throw new Error('事实 key 不能为空');
+    if (!v) throw new Error('事实值不能为空');
+    const ts = nowIso();
+    this.#stmt(
+      `INSERT INTO facts (brand_id, key, value, source_url, source_type, owner, valid_until, status, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(brand_id, key) DO UPDATE SET
+         value = excluded.value, source_url = excluded.source_url, source_type = excluded.source_type,
+         owner = excluded.owner, valid_until = excluded.valid_until, status = excluded.status, updated_at = excluded.updated_at`,
+    ).run(Number(brandId), k, v, sourceUrl, sourceType, owner, validUntil, status, ts, ts);
+    return this.getFact(brandId, k);
+  }
+
+  getFact(brandId, key) {
+    const row = this.#stmt('SELECT * FROM facts WHERE brand_id = ? AND key = ?').get(Number(brandId), String(key ?? ''));
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      brandId: Number(row.brand_id),
+      key: row.key,
+      value: row.value,
+      sourceUrl: row.source_url,
+      sourceType: row.source_type,
+      owner: row.owner,
+      validUntil: row.valid_until,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  listFacts(brandId) {
+    return this.#stmt('SELECT * FROM facts WHERE brand_id = ? ORDER BY key').all(Number(brandId)).map((row) => ({
+      id: Number(row.id),
+      brandId: Number(row.brand_id),
+      key: row.key,
+      value: row.value,
+      sourceUrl: row.source_url,
+      sourceType: row.source_type,
+      owner: row.owner,
+      validUntil: row.valid_until,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  deleteFact(brandId, key) {
+    return this.#stmt('DELETE FROM facts WHERE brand_id = ? AND key = ?').run(Number(brandId), String(key ?? '')).changes > 0;
   }
 
   // ----------------------------------------------------------- users / sessions
@@ -1071,10 +1256,25 @@ export class Store {
     }));
   }
 
-  createPublication({ contentId, channel, url = null, status = 'dry_run' } = {}) {
+  /** 撤回一条发布（发现事实错误/客户要求下架时用） */
+  withdrawPublication(publicationId, reason = '') {
+    return this.#stmt(
+      'UPDATE publications SET withdrawn_at = ?, withdraw_reason = ? WHERE id = ? AND withdrawn_at IS NULL',
+    ).run(nowIso(), String(reason ?? ''), Number(publicationId)).changes > 0;
+  }
+
+  createPublication({ contentId, channel, url = null, status = 'dry_run', account = null, factKeys = [] } = {}) {
     const result = this.#stmt(
-      'INSERT INTO publications (content_id, channel, url, status, created_at) VALUES (?,?,?,?,?)',
-    ).run(Number(contentId), channel ?? null, url ?? null, String(status ?? 'dry_run'), nowIso());
+      'INSERT INTO publications (content_id, channel, url, status, created_at, account, fact_keys_json) VALUES (?,?,?,?,?,?,?)',
+    ).run(
+      Number(contentId),
+      channel ?? null,
+      url ?? null,
+      String(status ?? 'dry_run'),
+      nowIso(),
+      account ?? null,
+      JSON.stringify(Array.isArray(factKeys) ? factKeys : []),
+    );
     return Number(result.lastInsertRowid);
   }
 

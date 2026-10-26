@@ -20,6 +20,7 @@ import { engineHasKey, engineReadiness, getEngine, listEngines } from './engines
 import { openStore } from './store.js';
 import { runDoctor } from './doctor.js';
 import { PLANS, resolveSubscription } from './plans.js';
+import { bearerOf, hashKey, hasScope } from './api-keys.js';
 import {
   actorOf,
   buildCookie,
@@ -49,6 +50,8 @@ import {
   loginPage,
   agentPage,
   alertsPage,
+  factsPage,
+  watchPage,
   attributionPage,
   billingPage,
   comparePage,
@@ -165,6 +168,9 @@ function snapshotOf(slug, requestedRunId = null) {
   }
   return snapshot;
 }
+
+// API 限流计数（单进程内存表，重启即清零）
+const API_RATE = new Map();
 
 function collectState(slug) {
   const state = {
@@ -380,7 +386,8 @@ async function handle(req, res, slug, auth = null) {
 
   // 当前登录者：优先会话 cookie，其次 Basic Auth（本机/运维兜底）
   let actor = null;
-  if (!(pathname.startsWith('/s/') || pathname === '/health' || pathname === '/login')) {
+  // /api/v1 用 Bearer API Key 自鉴权，不走会话门禁
+  if (!(pathname.startsWith('/s/') || pathname === '/health' || pathname === '/login' || pathname.startsWith('/api/v1/'))) {
     if (fs.existsSync(dbPath())) {
       let store = null;
       try {
@@ -966,6 +973,164 @@ async function handle(req, res, slug, auth = null) {
     return html(res, 200, distributionPage({ brand: state.brand, channels, contents, publications }));
   }
 
+  // ---------------------------------------------------------- 开放 API（/api/v1）
+  // 认证：Authorization: Bearer geo_xxx；按密钥作用域限流，只能读自己品牌。
+  if (pathname.startsWith('/api/v1/')) {
+    const token = bearerOf(req.headers.authorization ?? '');
+    if (!token) return json(res, 401, { ok: false, error: '缺少 Authorization: Bearer <api key>' });
+    let store = null;
+    let keyInfo = null;
+    try {
+      store = openStore(dbPath());
+      keyInfo = store.getApiKeyByHash(hashKey(token));
+      if (!keyInfo) return json(res, 401, { ok: false, error: 'API 密钥无效或已吊销' });
+      store.touchApiKey(keyInfo.id);
+    } catch {
+      return json(res, 500, { ok: false, error: '密钥校验失败' });
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    // 限流：每个密钥每分钟 120 次（内存计数，单进程够用）
+    const bucket = API_RATE.get(keyInfo.id) ?? { count: 0, resetAt: Date.now() + 60000 };
+    if (Date.now() > bucket.resetAt) {
+      bucket.count = 0;
+      bucket.resetAt = Date.now() + 60000;
+    }
+    bucket.count += 1;
+    API_RATE.set(keyInfo.id, bucket);
+    if (bucket.count > 120) {
+      res.setHeader?.('retry-after', '60');
+      return json(res, 429, { ok: false, error: '限流：每分钟最多 120 次' });
+    }
+
+    const apiSlug = keyInfo.brandSlug || slug;
+    const need = (scope) => (hasScope(keyInfo, scope) ? null : json(res, 403, { ok: false, error: `缺少 ${scope} 权限` }));
+    const route = pathname.slice('/api/v1'.length) || '/';
+
+    if (route === '/me') {
+      return json(res, 200, { ok: true, key: { name: keyInfo.name, prefix: keyInfo.prefix, scopes: keyInfo.scopes, brandSlug: keyInfo.brandSlug } });
+    }
+    if (route === '/state') {
+      const snapshot = snapshotOf(apiSlug, null);
+      return json(res, 200, {
+        ok: true,
+        brand: { slug: snapshot.state.brand.slug, name: snapshot.state.brand.name, city: snapshot.state.brand.city, industry: snapshot.state.brand.industry },
+        runs: snapshot.state.runs.slice(0, 20),
+        counts: snapshot.state.counts,
+        latestScore: snapshot.insights?.score?.total ?? null,
+      });
+    }
+    if (route === '/runs') {
+      const snapshot = snapshotOf(apiSlug, null);
+      const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit')) || 20));
+      return json(res, 200, { ok: true, runs: snapshot.state.runs.slice(0, limit) });
+    }
+    if (route === '/insights' || route === '/alerts' || route === '/attribution' || route === '/compare') {
+      const snapshot = snapshotOf(apiSlug, url.searchParams.get('run'));
+      if (!snapshot.insights) return json(res, 404, { ok: false, error: '该品牌还没有可分析的数据' });
+      if (route === '/insights') return json(res, 200, { ok: true, runId: snapshot.runId, insights: snapshot.insights });
+      if (route === '/alerts') {
+        const alertsMod = await import('./alerts.js');
+        return json(res, 200, alertsMod.evaluateAlerts({ brand: snapshot.state.brand, current: snapshot.insights, previous: snapshot.previous, settings: snapshot.settings, runId: snapshot.runId }));
+      }
+      if (route === '/attribution') {
+        const attributionMod = await import('./attribution.js');
+        return json(res, 200, attributionMod.buildAttribution({ brand: snapshot.state.brand, rows: snapshot.rows, contents: snapshot.contents, publications: snapshot.publications }));
+      }
+      const compareMod = await import('./compare.js');
+      const competitors = (snapshot.state.brand.competitors ?? []).map((c) => (typeof c === 'string' ? c : c?.name)).filter(Boolean);
+      return json(res, 200, compareMod.buildComparison({ brand: snapshot.state.brand, rows: snapshot.rows, competitors }));
+    }
+    if (route === '/share' && req.method === 'POST') {
+      const denied = need('share');
+      if (denied) return denied;
+      const body = await readBody(req);
+      const runId = Number(body.runId) || null;
+      const days = Math.max(1, Math.min(365, Number(body.days) || 30));
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const brandRow = store.getBrand(apiSlug);
+        if (!brandRow) return json(res, 404, { ok: false, error: '品牌不存在' });
+        const created = store.createShare({ brandId: brandRow.id, runId, days });
+        const base = String(process.env.GEO_PUBLIC_URL ?? body.base ?? '').replace(/\/+$/u, '');
+        return json(res, 200, { ok: true, token: created.token, url: base ? `${base}/s/${created.token}` : `/s/${created.token}`, expiresAt: created.expiresAt });
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return json(res, 404, { ok: false, error: `未知接口：${route}` });
+  }
+
+  // ---------------------------------------------------------- 巡检
+  if (req.method === 'GET' && pathname === '/watch') {
+    const state = collectState(slug);
+    let config = { enabled: false, intervalMinutes: 60, engines: 'live', limit: 12, lastRunAt: null };
+    let history = [];
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const brandRow = store.getBrand(slug);
+        if (brandRow) {
+          const watchMod = await import('./watch.js');
+          config = watchMod.watchConfig(store.listSettings(brandRow.id));
+          history = store.listWatchRuns({ brandSlug: slug, limit: 20 });
+        }
+      } catch {
+        /* 保持默认 */
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return html(res, 200, watchPage({ brand: state.brand, config, history, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+  }
+
+  // ---------------------------------------------------------- 事实库
+  if (req.method === 'GET' && pathname === '/facts') {
+    const state = collectState(slug);
+    let facts = [];
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const brandRow = store.getBrand(slug);
+        if (brandRow) facts = store.listFacts(brandRow.id);
+      } catch {
+        facts = [];
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    const factsMod = await import('./facts.js');
+    return html(res, 200, factsPage({ brand: state.brand, facts, health: factsMod.factHealth(facts), generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+  }
+
   // ---------------------------------------------------------- 异动告警
   if (req.method === 'GET' && pathname === '/alerts') {
     const snapshot = snapshotOf(slug, url.searchParams.get('run'));
@@ -1327,7 +1492,15 @@ async function handle(req, res, slug, auth = null) {
       if (!/^[a-zA-Z0-9_.-]{3,40}$/u.test(username)) return json(res, 400, { ok: false, error: '用户名 3-40 位字母/数字/._-' });
       if (password.length < 8) return json(res, 400, { ok: false, error: '密码至少 8 位' });
       store = openStore(dbPath());
-      if (!store.getBrand(brandSlug)) return json(res, 404, { ok: false, error: '品牌不存在' });
+      const targetBrand = store.getBrand(brandSlug);
+      if (!targetBrand) return json(res, 404, { ok: false, error: '品牌不存在' });
+      // 席位限制：按客户套餐算（未开通默认 1 个）
+      const sub = resolveSubscription(store.listSettings(targetBrand.id));
+      const seats = Math.max(1, sub.seats ?? 1);
+      const used = store.listUsers().filter((user) => user.brandSlug === brandSlug).length;
+      if (used >= seats) {
+        return json(res, 402, { ok: false, error: `席位已满：当前套餐 ${seats} 个账号，已用 ${used} 个。升级套餐或停用旧账号。` });
+      }
       const { hashPassword } = await import('./auth.js');
       store.createUser({ username, passHash: hashPassword(password), role: 'client', brandSlug });
       store.writeAudit({ actor: actor.username, brandSlug, action: 'user_create', detail: username });

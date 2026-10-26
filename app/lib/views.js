@@ -112,6 +112,8 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
     ['/run-diagnose', '跑诊断'],
     ['/cockpit', '语义份额驾驶舱'],
     ['/responses', '回答浏览器'],
+    ['/facts', '事实库'],
+    ['/watch', '巡检'],
     ['/alerts', '异动告警'],
     ['/attribution', '内容归因'],
     ['/compare', '竞品对位'],
@@ -1648,6 +1650,92 @@ ${
 
 <h2>我们的优势问题</h2>
 ${strengths ? `<div class="card"><ul style="margin:0;padding-left:20px;line-height:1.9">${strengths}</ul></div>` : '<div class="card empty">无</div>'}
+`,
+  });
+}
+
+/** 事实库页：登记与核对「内容只能引用的权威事实」 */
+export function factsPage({ brand = {}, facts = [], health = {}, generatedAt = '' } = {}) {
+  const rows = (facts ?? [])
+    .map(
+      (fact) => `<tr>
+      <td class="mono">${esc(fact.key)}</td>
+      <td>${esc(fact.value)}</td>
+      <td class="mono sub">${esc(fact.sourceUrl ?? '—')}</td>
+      <td>${esc(fact.owner ?? '—')}</td>
+      <td class="mono">${esc(fact.validUntil ? String(fact.validUntil).slice(0, 10) : '长期')}</td>
+      <td>${fact.status === 'verified' ? '<span class="badge ok">已核验</span>' : '<span class="badge warn">待核验</span>'}</td>
+    </tr>`,
+    )
+    .join('');
+  return layout({
+    title: '事实库',
+    active: '/facts',
+    body: `
+<h1>事实主数据</h1>
+<div class="sub">内容与报告只能引用这里登记过的事实 · 生成于 ${esc(generatedAt)}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">事实总数</div><div class="v">${esc(health.total ?? 0)}</div></div>
+  <div class="card"><div class="k">已核验</div><div class="v" style="color:#4ade80">${esc(health.verified ?? 0)}</div></div>
+  <div class="card"><div class="k">缺关键事实</div><div class="v" style="color:${(health.missing ?? []).length ? '#f87171' : '#4ade80'}">${esc((health.missing ?? []).length)}</div><div class="sub">${esc((health.missing ?? []).join('、') || '齐全')}</div></div>
+  <div class="card"><div class="k">不可用</div><div class="v" style="color:${(health.unusable ?? []).length ? '#fbbf24' : '#4ade80'}">${esc((health.unusable ?? []).length)}</div><div class="sub">缺来源/过期/未核验</div></div>
+</div>
+
+<div class="hint">为什么要有这一页：AI 把价格、资质、地址说错一次，客户会被投诉甚至处罚。登记「唯一可信源 + 责任人 + 有效期」后，
+写稿与报告只能引用可用事实；缺来源或过期的事实会被直接拦下。</div>
+
+<h2>登记事实（命令行）</h2>
+<div class="card"><pre class="mono" style="margin:0;white-space:pre-wrap">node bin/geo.js facts --brand ${esc(brand.slug ?? 'hengye')} --add \\
+  --key legal_name --value "芜湖恒野数字科技有限公司" \\
+  --source "https://你的官网/about" --owner "金XX" --valid-days 365</pre></div>
+
+<h2>事实清单</h2>
+${
+    (facts ?? []).length
+      ? `<table><thead><tr><th>字段</th><th>值</th><th>来源</th><th>责任人</th><th>有效期</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="card empty">还没有登记事实。先登记公司全称、城市、地址、电话、价格区间这 5 项关键事实。</div>`
+  }
+`,
+  });
+}
+
+/** 巡检页：7×24 配置 + 最近运行历史 */
+export function watchPage({ brand = {}, config = {}, history = [], generatedAt = '' } = {}) {
+  const rows = (history ?? [])
+    .map(
+      (item) => `<tr><td class="mono">#${esc(item.id)}</td>
+      <td class="mono">${esc(String(item.startedAt).slice(0, 19).replace('T', ' '))}</td>
+      <td><span class="badge ${item.status === 'done' ? 'ok' : item.status === 'failed' ? 'bad' : 'info'}">${esc(item.status)}</span></td>
+      <td class="sub mono">${esc(item.detail ?? '')}</td></tr>`,
+    )
+    .join('');
+  const next = config.enabled
+    ? new Date((config.lastRunAt ? new Date(config.lastRunAt).getTime() : Date.now()) + config.intervalMinutes * 60000).toLocaleString('zh-CN', { hour12: false })
+    : '未启用';
+  return layout({
+    title: '巡检',
+    active: '/watch',
+    body: `
+<h1>7×24 巡检</h1>
+<div class="sub">按间隔自动跑诊断，出问题能看出来 · 生成于 ${esc(generatedAt)}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">状态</div><div class="v" style="font-size:16px">${config.enabled ? '已启用' : '未启用'}</div></div>
+  <div class="card"><div class="k">间隔</div><div class="v">${esc(config.intervalMinutes)}<small> 分钟</small></div></div>
+  <div class="card"><div class="k">引擎 / 题数</div><div class="v" style="font-size:15px">${esc(config.engines)} · ${esc(config.limit)}</div></div>
+  <div class="card"><div class="k">下次预计</div><div class="v" style="font-size:14px">${esc(next)}</div></div>
+</div>
+
+<div class="hint">系统本身不会常驻，靠 cron / launchd / systemd 触发。生成调度配置：<span class="mono">node bin/geo.js watch --brand ${esc(brand.slug ?? 'hengye')} --install</span>。
+每次巡检都会写进下面的历史表，失败可追溯。</div>
+
+<h2>最近运行</h2>
+${
+    (history ?? []).length
+      ? `<table><thead><tr><th>#</th><th>开始时间</th><th>状态</th><th>详情</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="card empty">还没有巡检记录。启用后先手动跑一次：<span class="mono">node bin/geo.js watch --brand ${esc(brand.slug ?? 'hengye')} --run</span></div>`
+  }
 `,
   });
 }
