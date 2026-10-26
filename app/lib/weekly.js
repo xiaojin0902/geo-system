@@ -125,12 +125,11 @@ function textOf(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-/** 生成时间归一为 ISO 字符串；非法输入回落到当前时间 */
+/** 生成时间：调用方传入合法 ISO 就原样保留（便于复算比对），否则用当前时间 */
 function normalizeGeneratedAt(value) {
   const text = textOf(value);
   if (!text) return new Date().toISOString();
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? text : date.toISOString();
+  return Number.isNaN(new Date(text).getTime()) ? new Date().toISOString() : text;
 }
 
 /** 按 startedAt 倒序（不修改入参）；时间相同或缺时间时保持原顺序 */
@@ -223,13 +222,14 @@ function buildCitationTop(insights) {
     .slice(0, MAX_CITATION_TOP);
 }
 
-/** 竞品份额（含本品牌）：按份额降序，Top5 */
+/** 竞品份额（含本品牌）：按份额降序，Top5；本品牌份额再低也保留一行 */
 function buildCompetitorShare(insights, brandName) {
   const sov = insights?.sov;
   if (!sov || typeof sov !== 'object') return [];
   const rows = [];
   const brandShare = toNumber(sov.brandShare);
-  if (brandShare !== null) rows.push({ name: brandName || '本品牌', share: brandShare });
+  const brandEntry = brandShare === null ? null : { name: brandName || '本品牌', share: brandShare };
+  if (brandEntry) rows.push(brandEntry);
   const competitors = Array.isArray(sov.competitors) ? sov.competitors : [];
   for (const item of competitors) {
     const name = textOf(item?.name);
@@ -238,9 +238,15 @@ function buildCompetitorShare(insights, brandName) {
     if (!name || share === null || name === (brandName || '本品牌')) continue;
     rows.push({ name, share });
   }
-  return rows
-    .sort((a, b) => b.share - a.share || a.name.localeCompare(b.name, 'zh-Hans-CN'))
-    .slice(0, MAX_COMPETITORS);
+  const compare = (a, b) => b.share - a.share || a.name.localeCompare(b.name, 'zh-Hans-CN');
+  const top = rows.sort(compare).slice(0, MAX_COMPETITORS);
+  // Top5 被竞品占满时，用本品牌替换最后一名，保证「含本品牌」
+  if (brandEntry && !top.includes(brandEntry)) {
+    if (top.length >= MAX_COMPETITORS) top.pop();
+    top.push(brandEntry);
+    top.sort(compare);
+  }
+  return top;
 }
 
 /** 生成 headline：必须来自真实 delta，没有对比就明确写「首轮基线」 */
@@ -272,6 +278,7 @@ function buildHeadline({
 
   if (hasMentionCompare) {
     if (mentionPrev === 0) {
+      if (mentionNow === 0) return `AI 提及率仍为 0%${ownClause}`;
       return `AI 提及率从 0% 升至 ${formatPercent(mentionNow)}${ownClause}`;
     }
     if (mentionDelta !== null && mentionDelta >= 1) {
@@ -284,6 +291,7 @@ function buildHeadline({
   }
 
   if (scorePrev === 0) {
+    if (scoreNow === 0) return `综合分仍为 0 分${ownClause}`;
     return `综合分从 0 回升到 ${formatScore(scoreNow)}${ownClause}`;
   }
   if (scoreDelta !== null && scoreDelta > 0) {

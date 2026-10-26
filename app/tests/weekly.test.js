@@ -203,6 +203,18 @@ test('delta 支持负数：提及率与综合分同时下降', () => {
   assert.equal(report.highlights[0].type, 'down');
 });
 
+test('双方都为 0 时 headline 不写「升至」', () => {
+  const report = build({
+    runs: makeRuns({ latestTotal: 0 }),
+    insights: makeInsights({ mentionRate: 0, mentionOk: 50 }),
+    previous: { ...makePrevious({ mentionRate: 0 }), score: { total: 0 } },
+  });
+  assert.equal(report.summary.mentionDelta, null);
+  assert.equal(report.summary.scoreDelta, null);
+  assert.match(report.summary.headline, /仍为 0%/);
+  assert.doesNotMatch(report.summary.headline, /升至/);
+});
+
 test('summary 指标字段完整且口径正确', () => {
   const report = build();
   assert.deepEqual(report.summary, {
@@ -373,6 +385,14 @@ test('competitorShare 含本品牌、按份额降序并截断到 5 条', () => {
   assert.equal(report.competitorShare[0].name, '宇典科技');
 });
 
+test('本品牌份额很低时仍保留在 competitorShare 中', () => {
+  const report = build({ insights: makeInsights({ brandShare: 0.01 }) });
+  assert.equal(report.competitorShare.length, 5);
+  assert.ok(report.competitorShare.some((item) => item.name === '恒野'));
+  const shares = report.competitorShare.map((item) => item.share);
+  assert.deepEqual(shares, [...shares].sort((a, b) => b - a));
+});
+
 test('channels 映射多引擎覆盖', () => {
   const report = build();
   assert.equal(report.channels.length, 3);
@@ -402,8 +422,11 @@ test('Markdown 九个章节齐全且含指标表', () => {
   assert.match(markdown, /AI 提及率 25% → 42%/);
 });
 
-test('HTML 自包含：内联样式、无外链、无脚本', () => {
+test('HTML 自包含：完整文档、内联样式、无外链、无脚本', () => {
   const html = renderWeeklyHtml(build());
+  assert.ok(html.startsWith('<!DOCTYPE html>'));
+  assert.ok(html.includes('<html lang="zh-CN">'));
+  assert.ok(html.includes('<body'));
   assert.ok(html.includes('<style>'));
   assert.ok(html.includes('AI 提及率'));
   assert.ok(html.includes('本周亮点'));
