@@ -18,6 +18,14 @@ import { APP_ROOT, DATA_DIR, brandPath, dbPath } from './config.js';
 import { engineHasKey, listEngines } from './engines/index.js';
 import { openStore } from './store.js';
 import { runDoctor } from './doctor.js';
+import {
+  actorOf,
+  buildCookie,
+  clientCanAccess,
+  ensureAdmin,
+  newSessionToken,
+  verifyPassword,
+} from './auth.js';
 
 /** 页面里拼接品牌名等用户可控文本时的最小转义 */
 const escHtml = (value) =>
@@ -36,6 +44,11 @@ import {
   distributionPage,
   insightsPage,
   layout,
+  loginPage,
+  setTheme,
+  clientsPage,
+  settingsPage,
+  auditLogPage,
   notFoundPage,
   pipelinePage,
   questionsPage,
@@ -181,6 +194,19 @@ function readBody(req) {
   });
 }
 
+/** 读取原始请求体（表单提交用；readBody 只解析 JSON） */
+function readRawBody(req, limit = 200000) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', (chunk) => {
+      raw += chunk;
+      if (raw.length > limit) reject(new Error('请求体过大'));
+    });
+    req.on('end', () => resolve(raw));
+    req.on('error', reject);
+  });
+}
+
 /** 起一个 CLI 子进程，把输出流式收进 job（诊断与闭环验收共用） */
 function startCliJob(args, meta = {}) {
   const id = newJobId();
@@ -260,15 +286,147 @@ function checkAuth(req, auth) {
 }
 
 async function handle(req, res, slug, auth = null) {
-  // 客户分享链接（/s/<token>）自带凭证，不再走 Basic Auth
-  const isSharePath = String(req.url ?? '').startsWith('/s/');
-  if (!isSharePath && !checkAuth(req, auth)) {
-    res.writeHead(401, { 'www-authenticate': 'Basic realm="Hengye GEO", charset="UTF-8"' });
-    res.end('需要登录');
-    return;
-  }
   const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
   const pathname = decodeURIComponent(url.pathname);
+
+  // ---------------------------------------------------------------- 登录与会话
+  // 公开路径：健康检查、客户分享链接、登录页、静态图标
+  const isPublic =
+    pathname === '/health' || pathname.startsWith('/s/') || pathname === '/login' || pathname === '/favicon.ico';
+
+  // 当前登录者：优先会话 cookie，其次 Basic Auth（本机/运维兜底）
+  let actor = null;
+  if (!(pathname.startsWith('/s/') || pathname === '/health' || pathname === '/login')) {
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        actor = actorOf(store, req);
+      } catch {
+        actor = null;
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    if (!actor && checkAuth(req, auth)) {
+      actor = { username: 'admin', role: 'admin', brandSlug: null, viaBasic: true };
+    }
+    if (!actor) {
+      // 未登录：页面跳登录页，API 返回 401
+      if (pathname.startsWith('/api/')) {
+        return json(res, 401, { ok: false, error: '未登录' });
+      }
+      res.writeHead(302, { location: `/login?next=${encodeURIComponent(pathname)}` });
+      res.end();
+      return;
+    }
+    // 客户角色：只能看自己品牌，且只能访问白名单页面
+    if (actor.role === 'client') {
+      if (!actor.brandSlug) {
+        return html(res, 403, layout({ title: '未绑定品牌', body: '<h1>账号未绑定品牌</h1><div class="sub">请联系管理员。</div>' }));
+      }
+      slug = actor.brandSlug;
+      if (!clientCanAccess(pathname)) {
+        return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1><div class="sub">该页面仅管理员可用。</div>' }));
+      }
+    }
+  }
+
+  // 白标：按设置覆盖标题/logo/主色（每请求注入，避免多客户串台）
+  if (fs.existsSync(dbPath()) && !pathname.startsWith('/s/') && pathname !== '/health') {
+    let themeStore = null;
+    try {
+      themeStore = openStore(dbPath());
+      const globalSettings = themeStore.listSettings(null);
+      const brandRow = themeStore.getBrand(slug);
+      const brandSettings = brandRow ? themeStore.listSettings(brandRow.id) : {};
+      const merged = { ...globalSettings, ...brandSettings };
+      setTheme({
+        title: merged.app_title || '恒野 GEO',
+        logo: merged.logo_text || '恒野 GEO',
+        color: merged.primary_color || '#7c5cff',
+        footer: merged.footer_text || '',
+      });
+    } catch {
+      /* 主题失败不影响主流程 */
+    } finally {
+      if (themeStore) {
+        try {
+          themeStore.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  // 登录 / 登出
+  if (req.method === 'GET' && pathname === '/login') {
+    return html(res, 200, loginPage({ next: url.searchParams.get('next') ?? '/' }));
+  }
+  if (req.method === 'POST' && pathname === '/login') {
+    const raw = await readRawBody(req);
+    const form = new URLSearchParams(raw);
+    const username = String(form.get('username') ?? '').trim();
+    const password = String(form.get('password') ?? '');
+    let store = null;
+    try {
+      store = openStore(dbPath());
+      const user = store.getUser(username);
+      const ok = Boolean(user && user.active && verifyPassword(password, user.passHash));
+      const ip = req.socket?.remoteAddress ?? null;
+      if (!ok) {
+        store.writeAudit({ actor: username || 'anonymous', action: 'login_failed', detail: '用户名或密码错误', ip });
+        return html(res, 401, loginPage({ error: '用户名或密码错误', next: String(form.get('next') ?? '/') }));
+      }
+      const token = newSessionToken();
+      store.createSession({ token, username: user.username, role: user.role });
+      store.writeAudit({ actor: user.username, action: 'login', detail: `角色 ${user.role}`, ip });
+      const next = String(form.get('next') ?? '/');
+      const safeNext = next.startsWith('/') ? next : '/';
+      res.writeHead(302, { location: safeNext, 'set-cookie': buildCookie(token) });
+      res.end();
+      return;
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  if (pathname === '/logout') {
+    let store = null;
+    try {
+      store = openStore(dbPath());
+      const current = actorOf(store, req);
+      if (current) {
+        store.deleteSession(current.token);
+        store.writeAudit({ actor: current.username, action: 'logout', detail: '' });
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    res.writeHead(302, { location: '/login', 'set-cookie': buildCookie('', 0) });
+    res.end();
+    return;
+  }
 
   // ---------------------------------------------------------------- 静态报告
   if (pathname.startsWith('/reports/')) {
@@ -291,6 +449,7 @@ async function handle(req, res, slug, auth = null) {
           { name: 'DASHSCOPE_API_KEY', present: Boolean(process.env.DASHSCOPE_API_KEY) },
         ],
         engines: engineStatus(),
+        admin: actor?.role === 'admin',
         counts: state.counts,
         demoRuns,
         liveRuns: state.runs.length - demoRuns,
@@ -538,6 +697,247 @@ async function handle(req, res, slug, auth = null) {
     return html(res, 200, distributionPage({ brand: state.brand, channels, contents, publications }));
   }
 
+  // ---------------------------------------------------------- 客户周报
+  if (req.method === 'GET' && pathname === '/weekly') {
+    let report = null;
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const brandRow = store.getBrand(slug);
+        if (brandRow) {
+          const rows = store.listRuns(brandRow.id, 30);
+          if (rows.length) {
+            const runs = rows.map((r) => {
+              const score = store.getScore(r.id);
+              return {
+                runId: r.id,
+                kind: r.kind,
+                status: r.status,
+                samples: r.okN ?? null,
+                total: score?.total ?? null,
+                level: score?.level ?? null,
+                startedAt: r.startedAt ?? '',
+              };
+            });
+            const latest = runs.find((r) => r.total !== null) ?? runs[0];
+            const detail = store.getRunDetail(latest.runId);
+            const weeklyMod = await import('./weekly.js');
+            const analyticsMod = await import('./analytics.js');
+            let insights = detail ? analyticsMod.analyzeRun({ brand: brandRow, rows: detail.rows }) : null;
+            if (insights) insights.score = store.getScore(latest.runId);
+            let previous = null;
+            const prevRow = runs.find((r) => r.runId !== latest.runId);
+            if (prevRow) {
+              const prevDetail = store.getRunDetail(prevRow.runId);
+              if (prevDetail) {
+                previous = analyticsMod.analyzeRun({ brand: brandRow, rows: prevDetail.rows });
+                previous.score = store.getScore(prevRow.runId);
+              }
+            }
+            report = weeklyMod.buildWeeklyReport({ brand: brandRow, runs, insights, previous });
+          }
+        }
+      } catch {
+        report = null;
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    if (!report) {
+      return html(res, 200, layout({ title: '周报', active: '/weekly', body: '<h1>周报</h1><div class="card empty" style="margin-top:16px">还没有运行数据，先跑一轮诊断。</div>' }));
+    }
+    const weeklyMod = await import('./weekly.js');
+    // 周报本身就是一个完整 HTML 文档，直接返回（客户可打印/转发）
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(weeklyMod.renderWeeklyHtml(report));
+    return;
+  }
+
+  // ---------------------------------------------------------- 多客户管理（管理员）
+  if (req.method === 'GET' && pathname === '/clients') {
+    if (actor?.role !== 'admin') return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1>' }));
+    let clients = [];
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const users = store.listUsers();
+        clients = store.listBrands().map((brand) => {
+          const runs = store.listRuns(brand.id, 5);
+          const scored = runs.find((run) => run.total !== null) ?? runs[0] ?? null;
+          return {
+            slug: brand.slug,
+            name: brand.name,
+            runs: runs.length,
+            latestScore: scored?.total ?? null,
+            level: scored?.level ?? null,
+            lastRunAt: scored?.startedAt ?? null,
+            users: users.filter((u) => u.brandSlug === brand.slug).length,
+          };
+        });
+      } catch {
+        clients = [];
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return html(res, 200, clientsPage({ clients, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+  }
+
+  if (req.method === 'GET' && pathname === '/settings') {
+    if (actor?.role !== 'admin') return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1>' }));
+    let settings = {};
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        settings = store.listSettings(null);
+      } catch {
+        settings = {};
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return html(res, 200, settingsPage({ brand: readBrand(slug), settings, isAdmin: true, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+  }
+
+  if (req.method === 'GET' && pathname === '/audit-log') {
+    if (actor?.role !== 'admin') return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1>' }));
+    let entries = [];
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        entries = store.listAudit({ limit: 200 });
+      } catch {
+        entries = [];
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return html(res, 200, auditLogPage({ entries, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+  }
+
+  // 新建客户（管理员）
+  if (req.method === 'POST' && pathname === '/api/clients') {
+    if (actor?.role !== 'admin') return json(res, 403, { ok: false, error: '无权操作' });
+    let store = null;
+    try {
+      const body = await readBody(req);
+      const slug = String(body.slug ?? '').trim().toLowerCase();
+      const name = String(body.name ?? '').trim();
+      if (!/^[a-z0-9-]{2,40}$/u.test(slug)) return json(res, 400, { ok: false, error: 'slug 只能用 2-40 位小写字母/数字/连字符' });
+      if (!name) return json(res, 400, { ok: false, error: '品牌名不能为空' });
+      store = openStore(dbPath());
+      if (store.getBrand(slug)) return json(res, 409, { ok: false, error: `客户「${slug}」已存在` });
+      store.upsertBrand({
+        slug,
+        name,
+        legalName: name,
+        city: String(body.city ?? '').trim(),
+        industry: '内容代运营',
+        scope: '本地',
+        urls: body.url ? [String(body.url).trim()] : [],
+        aliases: [name],
+        rejectedNames: [],
+        competitors: [],
+      });
+      store.writeAudit({ actor: actor.username, brandSlug: slug, action: 'client_create', detail: name });
+      return json(res, 200, { ok: true, client: { slug, name } });
+    } catch (error) {
+      return json(res, 500, { ok: false, error: String(error?.message ?? error) });
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  // 创建客户账号（管理员）
+  if (req.method === 'POST' && pathname === '/api/users') {
+    if (actor?.role !== 'admin') return json(res, 403, { ok: false, error: '无权操作' });
+    let store = null;
+    try {
+      const body = await readBody(req);
+      const username = String(body.username ?? '').trim();
+      const password = String(body.password ?? '');
+      const brandSlug = String(body.brandSlug ?? '').trim();
+      if (!/^[a-zA-Z0-9_.-]{3,40}$/u.test(username)) return json(res, 400, { ok: false, error: '用户名 3-40 位字母/数字/._-' });
+      if (password.length < 8) return json(res, 400, { ok: false, error: '密码至少 8 位' });
+      store = openStore(dbPath());
+      if (!store.getBrand(brandSlug)) return json(res, 404, { ok: false, error: '品牌不存在' });
+      const { hashPassword } = await import('./auth.js');
+      store.createUser({ username, passHash: hashPassword(password), role: 'client', brandSlug });
+      store.writeAudit({ actor: actor.username, brandSlug, action: 'user_create', detail: username });
+      return json(res, 200, { ok: true, user: { username, role: 'client', brandSlug } });
+    } catch (error) {
+      return json(res, 500, { ok: false, error: String(error?.message ?? error) });
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  // 保存白标与配额
+  if (req.method === 'POST' && pathname === '/api/settings') {
+    if (actor?.role !== 'admin') return json(res, 403, { ok: false, error: '无权操作' });
+    let store = null;
+    try {
+      const body = await readBody(req);
+      store = openStore(dbPath());
+      for (const [key, value] of Object.entries(body)) {
+        if (!/^[a-z_]{2,40}$/u.test(key)) continue;
+        store.setSetting(key, String(value ?? ''), null);
+      }
+      store.writeAudit({ actor: actor.username, action: 'settings_update', detail: Object.keys(body).join(',') });
+      return json(res, 200, { ok: true });
+    } catch (error) {
+      return json(res, 500, { ok: false, error: String(error?.message ?? error) });
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   // ---------------------------------------------------------- 客户分享链接
   if (req.method === 'GET' && pathname.startsWith('/s/')) {
     const token = pathname.slice(3).trim();
@@ -734,6 +1134,42 @@ async function handle(req, res, slug, auth = null) {
     if (!/^(mock|live|all|[a-z0-9_,-]+)$/i.test(engines)) {
       return json(res, 400, { error: '引擎参数不合法' });
     }
+    // 用量配额：本月已采集样本数 + 本次题数 不得超过上限（0 = 不限）
+    try {
+      const quotaStore = openStore(dbPath());
+      try {
+        const brandRow = quotaStore.getBrand(slug);
+        if (brandRow) {
+          const quota = Number(quotaStore.getSetting('quota_questions', brandRow.id) ?? quotaStore.getSetting('quota_questions', null) ?? '0');
+          if (quota > 0) {
+            const monthStart = new Date();
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+            const used = quotaStore
+              .listRuns(brandRow.id, 500)
+              .filter((run) => run.startedAt && new Date(run.startedAt).getTime() >= monthStart.getTime())
+              .reduce((sum, run) => sum + Number(run.okN ?? 0), 0);
+            if (used + limit > quota) {
+              return json(res, 429, { error: `本月配额不足：已用 ${used}/${quota} 题，本次申请 ${limit} 题。请调整配额或下月再跑。` });
+            }
+          }
+        }
+      } finally {
+        quotaStore.close();
+      }
+    } catch {
+      /* 配额检查失败不阻断（宁可放行也不误杀） */
+    }
+    try {
+      const auditStore = openStore(dbPath());
+      try {
+        auditStore.writeAudit({ actor: actor?.username ?? 'unknown', brandSlug: slug, action: 'diagnose_start', detail: `engines=${engines} limit=${limit}` });
+      } finally {
+        auditStore.close();
+      }
+    } catch {
+      /* 审计失败不阻断 */
+    }
     return json(
       res,
       200,
@@ -799,6 +1235,34 @@ async function handle(req, res, slug, auth = null) {
  * @returns {Promise<{url:string, port:number, close:()=>Promise<void>, server:http.Server}>}
  */
 export async function startServer({ port = 8787, host = '127.0.0.1', brand = 'hengye', auth = null } = {}) {
+  // 首次启动自动建管理员：密码来自 ADMIN_PASSWORD，没配就随机生成并只打印一次
+  if (fs.existsSync(dbPath())) {
+    let store = null;
+    try {
+      store = openStore(dbPath());
+      const result = ensureAdmin(store, { password: String(process.env.ADMIN_PASSWORD ?? '').trim() });
+      if (result.created) {
+        console.log('');
+        console.log('════════════════════════════════════════');
+        console.log(`  已创建管理员账号：${result.username}`);
+        console.log(`  初始密码：${result.password}`);
+        console.log('  请登录后立即在「设置」里改密码（或重设 ADMIN_PASSWORD 后重建账号）');
+        console.log('════════════════════════════════════════');
+        console.log('');
+      }
+    } catch (error) {
+      console.log(`管理员初始化失败：${error?.message ?? error}`);
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   const server = http.createServer((req, res) => {
     handle(req, res, brand, auth).catch((error) => {
       if (res.headersSent) {

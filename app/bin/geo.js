@@ -37,6 +37,7 @@ const HELP = `
   seo        传统 SEO + 短视频 SEO 体检（对标摘星AI 三位一体）
   distribute 内容矩阵分发：把内容批量投到多个渠道（dry_run / 真实 API）
   share      客户分享链接：生成只读报告链接（可设到期，可吊销）
+  weekly     生成客户周报（对比上一轮），可推送到 webhook
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -68,6 +69,7 @@ const HELP = `
   node bin/geo.js distribute --content <id> [--channels 知乎,头条] [--all] [--live] [--json]
   node bin/geo.js share --run <id> [--days 30] [--base https://你的域名] [--json]
   node bin/geo.js share --list | --revoke <token>
+  node bin/geo.js weekly --brand hengye [--push <webhook>] [--json]
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -1238,6 +1240,7 @@ async function cmdPublish(flags) {
     }
 
     const publicationId = store.createPublication({ contentId, channel, url, status });
+    store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'publish', detail: `content=${contentId} channel=${channel} status=${status}` });
     store.updateContentStatus(contentId, status === 'published' ? 'published' : 'dry_run');
     const payload = {
       publicationId,
@@ -2450,6 +2453,7 @@ async function cmdShare(flags) {
     if (flags.revoke) {
       const token = stringFlag(flags.revoke, 'revoke');
       const ok = store.revokeShare(token);
+      store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'share_revoke', detail: token.slice(0, 10) });
       console.log(ok ? `已吊销：${token.slice(0, 8)}…` : `没找到该链接：${token.slice(0, 8)}…`);
       return ok ? 0 : 1;
     }
@@ -2480,6 +2484,7 @@ async function cmdShare(flags) {
     const runId = intFlag(flags.run, 'run', undefined);
     const days = intFlag(flags.days, 'days', 30);
     const created = store.createShare({ brandId: brand.id, runId: runId ?? null, days });
+    store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'share_create', detail: `run=${runId ?? 'latest'} days=${days}` });
     const base = (stringFlag(flags.base, 'base') ?? process.env.GEO_PUBLIC_URL ?? '').replace(/\/+$/u, '');
     const url = base ? `${base}/s/${created.token}` : `/s/${created.token}`;
 
@@ -2495,6 +2500,114 @@ async function cmdShare(flags) {
     }
     console.log(`  运行：${runId === null ? '该品牌最新一轮' : `#${runId}`} · 到期：${created.expiresAt ? created.expiresAt.slice(0, 10) : '长期'}`);
     console.log(`  吊销：node bin/geo.js share --revoke ${created.token}`);
+    return 0;
+  });
+}
+
+
+/** 客户周报：对比上一轮，生成 Markdown + HTML，可推送到 webhook。 */
+async function cmdWeekly(flags) {
+  const slug = brandSlug(flags);
+  let weeklyMod;
+  try {
+    weeklyMod = await import('../lib/weekly.js');
+  } catch (error) {
+    throw new CliError('周报模块不可用（lib/weekly.js）', [`详情：${error?.message ?? error}`]);
+  }
+
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+    const rows = store.listRuns(brand.id, 30);
+    if (!rows.length) {
+      throw new CliError('还没有运行数据', ['先跑一轮：node bin/geo.js diagnose --brand ' + slug + ' --engines mock --limit 12']);
+    }
+    // listRuns 返回的是 id/okN，总分要单独查（与 dashboard 同一口径）
+    const runs = rows.map((r) => {
+      const score = store.getScore(r.id);
+      return {
+        runId: r.id,
+        kind: r.kind,
+        status: r.status,
+        samples: r.okN ?? r.samples ?? null,
+        total: score?.total ?? null,
+        level: score?.level ?? null,
+        startedAt: r.startedAt ?? '',
+      };
+    });
+
+    const latest = runs.find((r) => r.total !== null && r.total !== undefined) ?? runs[0];
+    const detail = store.getRunDetail(latest.runId);
+    const insights = detail ? (await import('../lib/analytics.js')).analyzeRun({ brand, rows: detail.rows }) : null;
+    // 周报模块从 insights.score 读总分，这里补上（analyzeRun 本身不含分数）
+    if (insights) insights.score = store.getScore(latest.runId);
+
+    let previous = null;
+    const prevRow = runs.find((r) => r.runId !== latest.runId);
+    if (prevRow) {
+      const prevDetail = store.getRunDetail(prevRow.runId);
+      if (prevDetail) {
+        previous = (await import('../lib/analytics.js')).analyzeRun({ brand, rows: prevDetail.rows });
+        previous.score = store.getScore(prevRow.runId);
+      }
+    }
+
+    let plan = null;
+    if (insights) {
+      const planMod = await import('../lib/action-plan.js');
+      plan = planMod.buildActionPlan({
+        brand,
+        score: store.getScore(latest.runId),
+        insights,
+        rows: detail?.rows ?? [],
+        competitors: insights.sov?.competitors ?? [],
+      });
+    }
+
+    const report = weeklyMod.buildWeeklyReport({
+      brand,
+      runs,
+      insights,
+      previous,
+      plan,
+      generatedAt: new Date().toISOString(),
+    });
+    store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'weekly_generate', detail: `runs=${runs.length}` });
+    const markdown = weeklyMod.renderWeeklyMarkdown(report);
+    const htmlText = weeklyMod.renderWeeklyHtml(report);
+
+    const dir = path.join(DATA_DIR, 'reports');
+    fs.mkdirSync(dir, { recursive: true });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const mdFile = path.join(dir, `weekly-${slug}-${stamp}.md`);
+    const htmlFile = path.join(dir, `weekly-${slug}-${stamp}.html`);
+    fs.writeFileSync(mdFile, markdown, 'utf8');
+    fs.writeFileSync(htmlFile, htmlText, 'utf8');
+
+    // 推送：--push 或环境变量 WEEKLY_WEBHOOK（企微/钉钉/邮件网关都行）
+    const webhook = stringFlag(flags.push, 'push') ?? String(process.env.WEEKLY_WEBHOOK ?? '').trim();
+    let pushed = null;
+    if (webhook) {
+      try {
+        const res = await fetch(webhook, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: report.title, markdown, html: htmlText }),
+        });
+        pushed = { ok: res.ok, status: res.status };
+      } catch (error) {
+        pushed = { ok: false, error: String(error?.message ?? error) };
+      }
+    }
+
+    if (flags.json) {
+      console.log(JSON.stringify({ report, files: { md: mdFile, html: htmlFile }, pushed }, null, 2));
+      return 0;
+    }
+    console.log(markdown);
+    console.log('');
+    console.log(`已写入：${mdFile}`);
+    console.log(`        ${htmlFile}`);
+    if (pushed) console.log(pushed.ok ? `已推送 webhook（HTTP ${pushed.status}）` : `推送失败：${pushed.error ?? pushed.status}`);
     return 0;
   });
 }
@@ -2670,6 +2783,7 @@ const HANDLERS = {
   seo: cmdSeo,
   distribute: cmdDistribute,
   share: cmdShare,
+  weekly: cmdWeekly,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

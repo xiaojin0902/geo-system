@@ -138,6 +138,48 @@ CREATE TABLE IF NOT EXISTS publications (
 );
 CREATE INDEX IF NOT EXISTS idx_publications_content ON publications(content_id);
 
+
+-- 登录用户：admin 管全部客户端，client 只看自己品牌
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  pass_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'client',
+  brand_slug TEXT,
+  created_at TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
+-- 会话：token 存在 cookie 里，服务端可即时吊销
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  role TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+-- 白标与配额等设置：brand_id 为 NULL 表示全局
+CREATE TABLE IF NOT EXISTS settings (
+  brand_id INTEGER,
+  key TEXT NOT NULL,
+  value TEXT,
+  PRIMARY KEY (brand_id, key)
+);
+
+-- 审计日志：谁在什么时候对哪个客户做了什么
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  actor TEXT,
+  brand_slug TEXT,
+  action TEXT NOT NULL,
+  detail TEXT,
+  ip TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+
 -- 分享链接：给客户看的只读报告（token 即凭证，可设到期时间与吊销）
 CREATE TABLE IF NOT EXISTS shares (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -817,6 +859,141 @@ export class Store {
       createdAt: row.created_at,
       expiresAt: row.expires_at,
       revoked: Number(row.revoked) === 1,
+    }));
+  }
+
+
+  // ----------------------------------------------------------- users / sessions
+
+  createUser({ username, passHash, role = 'client', brandSlug = null } = {}) {
+    const name = String(username ?? '').trim();
+    if (!name) throw new Error('用户名不能为空');
+    try {
+      this.#stmt(
+        'INSERT INTO users (username, pass_hash, role, brand_slug, created_at, active) VALUES (?,?,?,?,?,1)',
+      ).run(name, String(passHash ?? ''), role === 'admin' ? 'admin' : 'client', brandSlug, nowIso());
+    } catch (error) {
+      if (String(error?.message ?? '').includes('UNIQUE')) throw new Error(`用户名「${name}」已存在`);
+      throw error;
+    }
+    return this.getUser(name);
+  }
+
+  getUser(username) {
+    const row = this.#stmt('SELECT * FROM users WHERE username = ?').get(String(username ?? ''));
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      username: row.username,
+      passHash: row.pass_hash,
+      role: row.role,
+      brandSlug: row.brand_slug,
+      active: Number(row.active) === 1,
+      createdAt: row.created_at,
+    };
+  }
+
+  listUsers() {
+    return this.#stmt('SELECT * FROM users ORDER BY id').all().map((row) => ({
+      id: Number(row.id),
+      username: row.username,
+      role: row.role,
+      brandSlug: row.brand_slug,
+      active: Number(row.active) === 1,
+      createdAt: row.created_at,
+    }));
+  }
+
+  setUserActive(username, active) {
+    return this.#stmt('UPDATE users SET active = ? WHERE username = ?').run(active ? 1 : 0, String(username ?? '')).changes > 0;
+  }
+
+  // ----------------------------------------------------------- sessions
+
+  createSession({ token, username, role, ttlDays = 7 } = {}) {
+    const expires = new Date(Date.now() + ttlDays * 86400000).toISOString();
+    this.#stmt('INSERT INTO sessions (token, username, role, created_at, expires_at) VALUES (?,?,?,?,?)').run(
+      String(token),
+      String(username),
+      role === 'admin' ? 'admin' : 'client',
+      nowIso(),
+      expires,
+    );
+    return expires;
+  }
+
+  getSession(token) {
+    const row = this.#stmt('SELECT * FROM sessions WHERE token = ?').get(String(token ?? ''));
+    if (!row) return null;
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+      this.deleteSession(row.token);
+      return null;
+    }
+    return { token: row.token, username: row.username, role: row.role, expiresAt: row.expires_at };
+  }
+
+  deleteSession(token) {
+    return this.#stmt('DELETE FROM sessions WHERE token = ?').run(String(token ?? '')).changes > 0;
+  }
+
+  purgeExpiredSessions() {
+    return this.#stmt('DELETE FROM sessions WHERE expires_at < ?').run(nowIso()).changes;
+  }
+
+  // ----------------------------------------------------------- settings（白标/配额）
+
+  getSetting(key, brandId = null) {
+    const row = brandId === null
+      ? this.#stmt('SELECT value FROM settings WHERE brand_id IS NULL AND key = ?').get(String(key))
+      : this.#stmt('SELECT value FROM settings WHERE brand_id = ? AND key = ?').get(Number(brandId), String(key));
+    return row ? row.value : null;
+  }
+
+  setSetting(key, value, brandId = null) {
+    if (brandId === null) {
+      this.#stmt('INSERT INTO settings (brand_id, key, value) VALUES (NULL, ?, ?) ON CONFLICT(brand_id, key) DO UPDATE SET value = excluded.value').run(String(key), String(value));
+    } else {
+      this.#stmt('INSERT INTO settings (brand_id, key, value) VALUES (?,?,?) ON CONFLICT(brand_id, key) DO UPDATE SET value = excluded.value').run(Number(brandId), String(key), String(value));
+    }
+    return true;
+  }
+
+  listSettings(brandId = null) {
+    const rows = brandId === null
+      ? this.#stmt('SELECT key, value FROM settings WHERE brand_id IS NULL').all()
+      : this.#stmt('SELECT key, value FROM settings WHERE brand_id = ?').all(Number(brandId));
+    const out = {};
+    for (const row of rows) out[row.key] = row.value;
+    return out;
+  }
+
+  // ----------------------------------------------------------- audit log
+
+  writeAudit({ actor = 'system', brandSlug = null, action, detail = '', ip = null } = {}) {
+    if (!action) throw new Error('审计动作不能为空');
+    this.#stmt('INSERT INTO audit_log (ts, actor, brand_slug, action, detail, ip) VALUES (?,?,?,?,?,?)').run(
+      nowIso(),
+      actor,
+      brandSlug,
+      String(action),
+      String(detail ?? ''),
+      ip,
+    );
+    return true;
+  }
+
+  listAudit({ brandSlug = null, limit = 100 } = {}) {
+    const rows = brandSlug
+      ? this.#stmt('SELECT * FROM audit_log WHERE brand_slug = ? ORDER BY id DESC LIMIT ?').all(brandSlug, Number(limit))
+      : this.#stmt('SELECT * FROM audit_log ORDER BY id DESC LIMIT ?').all(Number(limit));
+    return rows.map((row) => ({
+      id: Number(row.id),
+      ts: row.ts,
+      actor: row.actor,
+      brandSlug: row.brand_slug,
+      action: row.action,
+      detail: row.detail,
+      ip: row.ip,
     }));
   }
 

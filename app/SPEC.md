@@ -436,6 +436,17 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 服务端 `/s/<token>` 免 Basic Auth 渲染只读报告（过期或吊销返回 404 页面）。
 语义：`days=0` 为长期，负数即已过期；重复吊销返回 false。
 
+## 3.32 多客户 / 鉴权 / 白标 / 配额 / 审计 / 周报（2026-10-26 追加）
+
+- 鉴权：`lib/auth.js`（scrypt 密码、SQLite 会话、角色 admin|client）；`/login` `/logout`；
+  client 只能访问白名单页面且强制绑定自己的品牌；Basic Auth 保留作运维兜底。
+- 多客户：复用 `brands` 表，`/clients` 列表与新建（`POST /api/clients`）、客户账号（`POST /api/users`）。
+- 白标：`settings` 表（app_title/logo_text/primary_color/footer_text），`views.setTheme` 每请求注入。
+- 配额：`quota_questions`（0=不限），`/api/diagnose` 按本月已用样本拒绝超额请求（429）。
+- 审计：`audit_log` 表；登录、建客户、改设置、诊断、发布、分享、周报均落日志，`/audit-log` 可查。
+- 周报：`lib/weekly.js`（buildWeeklyReport/renderWeeklyMarkdown/renderWeeklyHtml）+ `geo weekly` + `/weekly`；
+  支持 `--push <webhook>`（企微/钉钉/邮件网关）。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

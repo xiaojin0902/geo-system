@@ -9,6 +9,25 @@
  * 视觉约定：深色、单文件内联 CSS、无外部资源（离线可用、不依赖 CDN）。
  */
 
+
+// ── 白标主题：布局读取这里的值，服务端每请求按客户设置注入 ──
+let THEME = { title: '恒野 GEO', logo: '恒野 <i>GEO</i>', color: '#7c5cff', footer: '' };
+
+/** 设置进程内主题（白标） */
+export function setTheme(partial = {}) {
+  THEME = {
+    title: String(partial.title ?? THEME.title),
+    logo: String(partial.logo ?? THEME.logo),
+    color: String(partial.color ?? THEME.color),
+    footer: String(partial.footer ?? THEME.footer),
+  };
+}
+
+/** 读当前主题（测试与页面用） */
+export function getTheme() {
+  return { ...THEME };
+}
+
 const esc = (value) =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -77,7 +96,7 @@ font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:320px;overflow:au
  * 页面外壳。
  * @param {{title:string, active:string, body:string, brandName?:string, right?:string}} options
  */
-export function layout({ title, active = '', body = '', brandName = '恒野', right = '' }) {
+export function layout({ title, active = '', body = '', brandName = '', right = '' }) {
   const items = [
     ['/', '总览'],
     ['/run-diagnose', '跑诊断'],
@@ -85,6 +104,7 @@ export function layout({ title, active = '', body = '', brandName = '恒野', ri
     ['/insights', '可见度分析'],
     ['/tools', '工具箱'],
     ['/distribution', '分发矩阵'],
+    ['/weekly', '周报'],
     ['/pipeline', '闭环验收'],
     ['/questions', '问题库'],
     ['/audit', '官网体检'],
@@ -98,14 +118,16 @@ export function layout({ title, active = '', body = '', brandName = '恒野', ri
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} · 恒野 GEO</title>
-<style>${CSS}</style></head>
+<title>${esc(title)} · ${esc(THEME.title)}</title>
+<style>${CSS}
+:root{--accent:${THEME.color};--accent-dim:${THEME.color}33}
+</style></head>
 <body>
 <div class="nav">
-  <span class="logo">恒野 <i>GEO</i></span>
+  <span class="logo">${THEME.logo.replace(/[<]/g, '')}</span>
   ${nav}
   <span class="spacer"></span>
-  <span class="sub">${esc(brandName)}</span>
+  <span class="sub">${esc(brandName || THEME.title)}</span>
   ${right ? `<span style="margin-left:10px">${right}</span>` : ''}
 </div>
 <div class="wrap">${body}</div>
@@ -125,6 +147,7 @@ export function dashboardPage({
   counts = {},
   demoRuns = 0,
   liveRuns = 0,
+  admin = false,
 }) {
   const configured = keys.filter((k) => k.present);
   const keyLine = keys.length
@@ -172,6 +195,14 @@ export function dashboardPage({
   const body = `
 <h1>${esc(brand.name ?? '恒野')} · GEO 控制台</h1>
 <div class="sub">${esc([brand.city, brand.scope, brand.industry].filter(Boolean).join(' · ') || '品牌信息待补充')}</div>
+
+${admin ? `<div class="hint" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+  <b>管理员</b>
+  <a href="/clients" style="color:#b6a4ff">客户管理</a>
+  <a href="/settings" style="color:#b6a4ff">白标与配额</a>
+  <a href="/audit-log" style="color:#b6a4ff">审计日志</a>
+  <a href="/logout" style="color:var(--dim2)">退出登录</a>
+</div>` : '<div style="margin-bottom:10px"><a href="/logout" style="color:var(--dim2);font-size:12px">退出登录</a></div>'}
 
 ${configured.length === 0
       ? `<div class="hint"><b>现在跑的是演示数据。</b>在 <span class="mono">hengye-geo/app/.env</span> 里填
@@ -1077,6 +1108,176 @@ export function videoPage({ brand = {}, files = [], selected = null, content = '
 
 <div class="hint">说明：这里产出的是「可拍摄的脚本」，不含视频渲染与数字人（需要外部视频模型/付费服务）。脚本已内置合规检查：绝对化用语、效果承诺、无来源数字会在生成时被标出。</div>`;
   return layout({ title: '短视频脚本', active: '/video', body, brandName: brand.name ?? '恒野' });
+}
+
+/** 登录页：客户与管理员都用它进系统 */
+export function loginPage({ error = '', next = '/' } = {}) {
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · 恒野 GEO</title>
+<meta name="robots" content="noindex"><style>${CSS}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.box{width:360px;background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px;padding:28px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--dim2);font-size:12px;margin-bottom:18px}
+label{display:block;font-size:12px;color:var(--dim);margin:12px 0 6px}
+input{width:100%;background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+button{width:100%;margin-top:18px;background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px;font-size:14px;cursor:pointer}
+.err{background:rgba(239,68,68,.12);color:#f87171;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+.hint2{color:var(--dim2);font-size:11.5px;margin-top:14px;line-height:1.7}
+</style></head><body>
+<form class="box" method="post" action="/login">
+  <h1>恒野 <span style="color:var(--accent)">GEO</span></h1>
+  <div class="sub">AI 可见度监测系统 · 请登录</div>
+  ${error ? `<div class="err">${esc(error)}</div>` : ''}
+  <input type="hidden" name="next" value="${esc(next)}">
+  <label>用户名</label><input name="username" autocomplete="username" required autofocus>
+  <label>密码</label><input name="password" type="password" autocomplete="current-password" required>
+  <button type="submit">登录</button>
+  <div class="hint2">管理员首次启动时，终端会打印初始密码；客户账号由管理员创建。</div>
+</form></body></html>`;
+}
+
+/**
+ * 客户列表（仅管理员）：一屏看所有客户的最新分数与账号。
+ */
+export function clientsPage({ clients = [], generatedAt = '' } = {}) {
+  const rows = clients
+    .map(
+      (c) => `<tr>
+        <td><b>${esc(c.name ?? c.slug)}</b><div class="sub mono">${esc(c.slug)}</div></td>
+        <td class="mono">${c.latestScore === null || c.latestScore === undefined ? '—' : esc(c.latestScore)}</td>
+        <td>${esc(c.level ?? '—')}</td>
+        <td class="mono">${esc(c.runs ?? 0)}</td>
+        <td class="mono">${esc(c.lastRunAt ? String(c.lastRunAt).slice(0, 10) : '—')}</td>
+        <td class="mono">${esc(c.users ?? 0)}</td>
+        <td><a href="/?brand=${encodeURIComponent(c.slug)}" style="color:#b6a4ff">看板</a></td>
+      </tr>`,
+    )
+    .join('');
+  return layout({
+    title: '客户管理',
+    active: '/clients',
+    body: `
+<h1>客户管理</h1>
+<div class="sub">共 ${esc(clients.length)} 个客户 · 生成于 ${esc(generatedAt)}</div>
+
+<h2>新建客户</h2>
+<div class="card">
+  <form id="createForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <div><label class="sub">品牌名</label><br><input name="name" placeholder="如 王某的烘焙店" required style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px"></div>
+    <div><label class="sub">slug（英文）</label><br><input name="slug" placeholder="wang-bakery" required pattern="[a-z0-9-]+" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px"></div>
+    <div><label class="sub">城市</label><br><input name="city" placeholder="芜湖" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px"></div>
+    <div><label class="sub">官网</label><br><input name="url" placeholder="https://" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px;min-width:200px"></div>
+    <button type="submit" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer">创建</button>
+  </form>
+  <div id="msg" class="sub" style="margin-top:10px"></div>
+</div>
+
+<h2>创建客户账号</h2>
+<div class="card">
+  <form id="userForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <div><label class="sub">登录名</label><br><input name="username" placeholder="wanglaoban" required style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px"></div>
+    <div><label class="sub">初始密码（≥8 位）</label><br><input name="password" type="password" required minlength="8" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px"></div>
+    <div><label class="sub">绑定客户</label><br>
+      <select name="brandSlug" required style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+        ${clients.map((c) => `<option value="${esc(c.slug)}">${esc(c.name)}（${esc(c.slug)}）</option>`).join('')}
+      </select></div>
+    <button type="submit" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer">创建账号</button>
+  </form>
+  <div id="umsg" class="sub" style="margin-top:10px"></div>
+</div>
+
+<h2>全部客户</h2>
+${
+    clients.length
+      ? `<table><thead><tr><th>客户</th><th>最新分</th><th>等级</th><th>运行</th><th>最近运行</th><th>账号</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="card empty">还没有客户</div>`
+  }
+
+<script>
+document.getElementById('createForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const payload = Object.fromEntries(form.entries());
+  const msg = document.getElementById('msg');
+  msg.textContent = '创建中…';
+  const res = await fetch('/api/clients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  const data = await res.json();
+  msg.textContent = res.ok ? '已创建：' + data.client.slug + '（刷新页面可见）' : '失败：' + (data.error || res.status);
+  if (res.ok) setTimeout(() => location.reload(), 800);
+});
+document.getElementById('userForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  const msg = document.getElementById('umsg');
+  const res = await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  const data = await res.json().catch(() => ({}));
+  msg.textContent = res.ok ? '已创建账号：' + data.user.username + '（绑定 ' + data.user.brandSlug + '）' : '失败：' + (data.error || res.status);
+  if (res.ok) e.target.reset();
+});
+</script>`,
+  });
+}
+
+/** 白标与配额设置（管理员可改全局与各客户） */
+export function settingsPage({ brand = {}, settings = {}, isAdmin = false, generatedAt = '' } = {}) {
+  const field = (name, label, value, hint = '') =>
+    `<div style="margin-bottom:14px"><label class="sub">${esc(label)}</label><br>
+      <input name="${esc(name)}" value="${esc(value ?? '')}" style="width:100%;max-width:520px;background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+      ${hint ? `<div class="sub" style="margin-top:4px">${esc(hint)}</div>` : ''}</div>`;
+  return layout({
+    title: '白标与配额',
+    active: '/settings',
+    body: `
+<h1>白标与配额</h1>
+<div class="sub">客户看到的名字、颜色、页脚与用量上限 · 生成于 ${esc(generatedAt)}</div>
+
+<form id="settingsForm" class="card" style="margin-top:16px">
+  ${field('app_title', '系统名称', settings.app_title ?? '恒野 GEO', '显示在浏览器标题与页头')}
+  ${field('logo_text', 'Logo 文案', settings.logo_text ?? '恒野 GEO')}
+  ${field('primary_color', '主色（HEX）', settings.primary_color ?? '#7c5cff')}
+  ${field('footer_text', '页脚文案', settings.footer_text ?? '')}
+  ${field('public_url', '对外访问地址', settings.public_url ?? '', '用于生成分享链接，如 https://geo.sanrenxing.cn')}
+  ${field('quota_questions', '每月题数上限', settings.quota_questions ?? '300', '0 表示不限；超出后诊断会被拒绝')}
+  <button type="submit" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 18px;cursor:pointer">保存</button>
+  <span id="msg" class="sub" style="margin-left:10px"></span>
+</form>
+
+<div class="hint">白标只改「客户看到的东西」，不改算法口径。多客户场景下，每个客户可单独设配额；全局设置作用于默认品牌。</div>
+
+<script>
+document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  const msg = document.getElementById('msg');
+  const res = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  const data = await res.json().catch(() => ({}));
+  msg.textContent = res.ok ? '已保存' : '失败：' + (data.error || res.status);
+});
+</script>`,
+  });
+}
+
+/** 审计日志（管理员）：谁在什么时候对哪个客户做了什么 */
+export function auditLogPage({ entries = [], generatedAt = '' } = {}) {
+  const rows = entries
+    .map(
+      (e) => `<tr><td class="mono">${esc(String(e.ts).slice(0, 19).replace('T', ' '))}</td>
+        <td>${esc(e.actor ?? '—')}</td><td class="mono">${esc(e.brandSlug ?? '—')}</td>
+        <td><span class="badge mut">${esc(e.action)}</span></td><td class="sub">${esc(e.detail ?? '')}</td></tr>`,
+    )
+    .join('');
+  return layout({
+    title: '审计日志',
+    active: '/audit-log',
+    body: `
+<h1>审计日志</h1>
+<div class="sub">登录、诊断、发布、分享等关键动作 · 最近 ${esc(entries.length)} 条 · ${esc(generatedAt)}</div>
+${
+    entries.length
+      ? `<table style="margin-top:16px"><thead><tr><th>时间</th><th>操作者</th><th>客户</th><th>动作</th><th>详情</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="card empty" style="margin-top:16px">还没有审计记录</div>`
+  }`,
+  });
 }
 
 /**
