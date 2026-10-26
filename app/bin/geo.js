@@ -42,6 +42,9 @@ ${systemEdition()} · 命令行（node bin/geo.js）
   client     开通/续费客户订阅（自助版 / 托管版）
   agent      代理管理：开通代理、分配客户、查看分成
   bill       托管结算单：按效果计量（新增提及/引用/提及率/推荐次数）
+  alerts     异动告警：本期 vs 上期，谁掉了/谁涨了（可推送 webhook）
+  attribution 内容归因：我们发的哪篇文章被 AI 引用了
+  compare    竞品对位：同一个问题 AI 提了谁
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -79,6 +82,9 @@ ${systemEdition()} · 命令行（node bin/geo.js）
   node bin/geo.js agent --add --username 代理 --password 密码 --name 名称 --quota 5000
   node bin/geo.js agent --list | --report --username 代理
   node bin/geo.js bill --brand <客户> [--month 2026-10] [--baseline-run <id>] [--json]
+  node bin/geo.js alerts --brand <客户> [--run <id>] [--push <webhook>] [--json]
+  node bin/geo.js attribution --brand <客户> [--json]
+  node bin/geo.js compare --brand <客户> [--json]
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -2869,6 +2875,113 @@ async function cmdBill(flags) {
   });
 }
 
+
+/** 取「某轮 + 上一轮」的分析快照（三个分析命令共用，口径一致）。 */
+async function analysisSnapshot(store, brand, requestedRunId) {
+  const { analyzeRun } = await import('../lib/analytics.js');
+  const runs = store.listRuns(brand.id, 50);
+  const latest = runs.find((run) => run.total !== null) ?? runs[0];
+  if (!latest) throw new CliError(`品牌「${brand.slug}」还没有运行数据`, ['先跑：node bin/geo.js diagnose --brand ' + brand.slug + ' --engines mock --limit 12']);
+  const runId = requestedRunId && requestedRunId > 0 ? requestedRunId : latest.id;
+  const detail = store.getRunDetail(runId);
+  if (!detail) throw new CliError(`运行 #${runId} 没有明细数据`);
+  const insights = analyzeRun({ brand, rows: detail.rows });
+  insights.score = store.getScore(runId);
+  let previous = null;
+  const prevRow = runs.find((run) => run.id !== runId);
+  if (prevRow) {
+    const prevDetail = store.getRunDetail(prevRow.id);
+    if (prevDetail) {
+      previous = analyzeRun({ brand, rows: prevDetail.rows });
+      previous.score = store.getScore(prevRow.id);
+    }
+  }
+  return { runId, rows: detail.rows, insights, previous, settings: store.listSettings(brand.id), runs };
+}
+
+/** 异动告警：本期 vs 上期，可推送。 */
+async function cmdAlerts(flags) {
+  const slug = brandSlug(flags);
+  const runId = intFlag(flags.run, 'run', undefined);
+  const alertsMod = await import('../lib/alerts.js');
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+    const snapshot = await analysisSnapshot(store, brand, runId);
+    const result = alertsMod.evaluateAlerts({
+      brand,
+      current: snapshot.insights,
+      previous: snapshot.previous,
+      settings: snapshot.settings,
+      runId: snapshot.runId,
+    });
+    const markdown = alertsMod.renderAlertsMarkdown(result);
+
+    const webhook = stringFlag(flags.push, 'push') ?? String(snapshot.settings.alert_webhook ?? process.env.ALERT_WEBHOOK ?? '').trim();
+    let pushed = null;
+    if (webhook && alertsMod.shouldNotify(result)) {
+      try {
+        const res = await fetch(webhook, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: `${brand.name} 可见度异动`, markdown, summary: result.summary }),
+        });
+        pushed = { ok: res.ok, status: res.status };
+      } catch (error) {
+        pushed = { ok: false, error: String(error?.message ?? error) };
+      }
+    }
+
+    if (flags.json) {
+      console.log(JSON.stringify({ result, pushed }, null, 2));
+      return 0;
+    }
+    console.log(markdown);
+    if (pushed) console.log(pushed.ok ? `已推送 webhook（HTTP ${pushed.status}）` : `推送失败：${pushed.error ?? pushed.status}`);
+    else if (webhook) console.log('本期无严重/警告/利好，未推送（避免打扰）');
+    return 0;
+  });
+}
+
+/** 内容归因：哪篇文章被 AI 引用了。 */
+async function cmdAttribution(flags) {
+  const slug = brandSlug(flags);
+  const attributionMod = await import('../lib/attribution.js');
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+    const snapshot = await analysisSnapshot(store, brand, intFlag(flags.run, 'run', undefined));
+    const report = attributionMod.buildAttribution({
+      brand,
+      rows: snapshot.rows,
+      contents: store.listContents(brand.id),
+      publications: store.listPublications ? store.listPublications(brand.id) : [],
+    });
+    if (flags.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return 0;
+    }
+    console.log(attributionMod.renderAttributionMarkdown(report));
+    return 0;
+  });
+}
+
+/** 竞品对位：同一个问题 AI 提了谁。 */
+async function cmdCompare(flags) {
+  const slug = brandSlug(flags);
+  const compareMod = await import('../lib/compare.js');
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+    const snapshot = await analysisSnapshot(store, brand, intFlag(flags.run, 'run', undefined));
+    const competitors = (brand.competitors ?? []).map((c) => (typeof c === 'string' ? c : c?.name)).filter(Boolean);
+    const report = compareMod.buildComparison({ brand, rows: snapshot.rows, competitors });
+    if (flags.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return 0;
+    }
+    console.log(compareMod.renderComparisonMarkdown(report));
+    return 0;
+  });
+}
+
 // ---------------------------------------------------- doctor / audit / serve
 // 这三个命令解决的是「装完之后怎么用起来」，不是采集主链路，因此单独成段。
 
@@ -3044,6 +3157,9 @@ const HANDLERS = {
   client: cmdClient,
   agent: cmdAgent,
   bill: cmdBill,
+  alerts: cmdAlerts,
+  attribution: cmdAttribution,
+  compare: cmdCompare,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

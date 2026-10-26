@@ -112,6 +112,9 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
     ['/run-diagnose', '跑诊断'],
     ['/cockpit', '语义份额驾驶舱'],
     ['/responses', '回答浏览器'],
+    ['/alerts', '异动告警'],
+    ['/attribution', '内容归因'],
+    ['/compare', '竞品对位'],
     ['/insights', '可见度分析'],
     ['/tools', '工具箱'],
     ['/distribution', '分发矩阵'],
@@ -1514,6 +1517,137 @@ export function responsesPage({ brand = {}, runs = [], runId = null, rows = [], 
 </form>
 
 ${items || '<div class="card empty">这一轮没有可展示的回答（或筛选后为空）</div>'}
+`,
+  });
+}
+
+/** 异动告警页：本期 vs 上期，谁掉了、谁涨了、该做什么 */
+export function alertsPage({ brand = {}, result = {}, runId = null, runs = [], generatedAt = '' } = {}) {
+  const icon = { critical: '🔴', warning: '🟡', positive: '🟢', info: '⚪' };
+  const badge = { critical: 'bad', warning: 'warn', positive: 'ok', info: 'mut' };
+  const runOptions = runs
+    .map((r) => `<option value="${esc(r.runId)}"${String(r.runId) === String(runId) ? ' selected' : ''}>#${esc(r.runId)} · ${esc(r.kind)}</option>`)
+    .join('');
+  const items = (result.alerts ?? [])
+    .map(
+      (alert) => `<div class="card" style="margin-bottom:10px;border-left:3px solid ${alert.level === 'critical' ? '#ef4444' : alert.level === 'warning' ? '#f59e0b' : alert.level === 'positive' ? '#22c55e' : '#252a36'}">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <b>${icon[alert.level] ?? '•'} ${esc(alert.title)}</b>
+        <span class="badge ${badge[alert.level] ?? 'mut'}">${esc(alert.level)}</span>
+      </div>
+      <div class="sub" style="margin-top:6px">${esc(alert.detail)}</div>
+      <div class="sub" style="margin-top:6px;color:#8b93a7">→ ${esc(alert.action)}</div>
+    </div>`,
+    )
+    .join('');
+  const s = result.summary ?? {};
+  return layout({
+    title: '异动告警',
+    active: '/alerts',
+    body: `
+<h1>异动告警</h1>
+<div class="sub">本期 vs 上期 · 阈值：提及率 ±${esc(result.thresholds?.mentionDropPt ?? 15)}pt / 总分 −${esc(result.thresholds?.scoreDrop ?? 10)} / 竞品 +${esc(result.thresholds?.competitorGainPt ?? 20)}pt</div>
+
+<form method="get" action="/alerts" class="row" style="margin:16px 0">
+  <select name="run" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px">${runOptions}</select>
+  <button type="submit" style="background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer">查看</button>
+</form>
+
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="card"><div class="k">告警总数</div><div class="v">${esc(s.total ?? 0)}</div></div>
+  <div class="card"><div class="k">严重</div><div class="v" style="color:#f87171">${esc(s.critical ?? 0)}</div></div>
+  <div class="card"><div class="k">警告</div><div class="v" style="color:#fbbf24">${esc(s.warning ?? 0)}</div></div>
+  <div class="card"><div class="k">利好</div><div class="v" style="color:#4ade80">${esc(s.positive ?? 0)}</div></div>
+</div>
+
+${items || '<div class="card empty">本期没有异动</div>'}
+
+<div class="hint">告警来自两轮真实数据的环比，不是模型判断。阈值可在「白标与配额」里用
+<span class="mono">alert_mention_drop_pt</span> / <span class="mono">alert_score_drop</span> / <span class="mono">alert_competitor_gain_pt</span> 调整。</div>
+`,
+  });
+}
+
+/** 内容归因页：哪篇文章被 AI 引用了 */
+export function attributionPage({ brand = {}, report = {}, generatedAt = '' } = {}) {
+  const totals = report.totals ?? {};
+  const rows = (report.byContent ?? [])
+    .map(
+      (item, index) => `<tr>
+      <td class="mono">${index + 1}</td>
+      <td><b>${esc(item.title || `#${item.contentId}`)}</b><div class="sub">${esc(item.publications.map((p) => `${p.channel}（${p.status}）`).join(' · '))}</div></td>
+      <td class="mono">${esc(item.citations)}</td>
+      <td class="sub">${esc(item.engines.join('、') || '—')}</td>
+      <td class="sub">${esc(item.questions.slice(0, 2).join('；') || '—')}</td>
+    </tr>`,
+    )
+    .join('');
+  return layout({
+    title: '内容归因',
+    active: '/attribution',
+    body: `
+<h1>内容引用归因</h1>
+<div class="sub">我们发的哪篇文章被 AI 引用了 · 生成于 ${esc(generatedAt)}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">AI 引用总数</div><div class="v">${esc(totals.citations ?? 0)}</div><div class="sub">来自 ${esc(totals.questions ?? 0)} 个问题</div></div>
+  <div class="card"><div class="k">自有域名被引</div><div class="v">${esc(totals.ownCitations ?? 0)}</div><div class="sub">占比 ${(((totals.ownShare ?? 0)) * 100).toFixed(1)}%</div></div>
+  <div class="card"><div class="k">已绑定内容</div><div class="v">${esc(totals.contents ?? 0)}</div><div class="sub">有发布 URL 的内容</div></div>
+  <div class="card"><div class="k">发布记录</div><div class="v">${esc(totals.publications ?? 0)}</div><div class="sub">含 dry_run</div></div>
+</div>
+
+<h2>内容贡献榜</h2>
+${
+    (report.byContent ?? []).length
+      ? `<table><thead><tr><th>#</th><th>内容 / 渠道</th><th>被引次数</th><th>引擎</th><th>命中问题</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="card empty">本期没有「已发布 URL」被引用。先在内容库里给内容补发布 URL（publish --url），再跑诊断。</div>`
+  }
+
+<h2>自有域名被引（未绑定内容）</h2>
+${
+    (report.ownCitationsUnmatched ?? []).length
+      ? `<div class="card"><ul style="margin:0;padding-left:20px;line-height:1.9">${report.ownCitationsUnmatched.map((c) => `<li class="mono">${esc(c.url)}（${esc(c.engine)}）</li>`).join('')}</ul></div>`
+      : `<div class="card empty">无（或自有域名没有被引）</div>`
+  }
+
+<h2>引用源 Top</h2>
+<div class="card"><ul style="margin:0;padding-left:20px;line-height:1.9">
+${(report.topDomains ?? []).slice(0, 10).map((d) => `<li>${esc(d.domain)}${d.own ? ' <span class="badge ok">自有</span>' : ''} · ${esc(d.count)} 次</li>`).join('') || '<li class="sub">无引用</li>'}
+</ul></div>
+`,
+  });
+}
+
+/** 竞品对位页：同一个问题，AI 提了谁 */
+export function comparePage({ brand = {}, report = {}, generatedAt = '' } = {}) {
+  const s = report.summary ?? {};
+  const gaps = (report.gaps ?? [])
+    .map((gap) => `<tr><td>${esc(gap.question)}</td><td>${esc(gap.competitors.join('、'))}</td></tr>`)
+    .join('');
+  const strengths = (report.strengths ?? []).map((item) => `<li>${esc(item.question)}</li>`).join('');
+  return layout({
+    title: '竞品对位',
+    active: '/compare',
+    body: `
+<h1>竞品对位</h1>
+<div class="sub">同一个问题，AI 提了谁、没提谁 · ${esc((report.competitors ?? []).join('、') || '未配置竞品')} · 生成于 ${esc(generatedAt)}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">本品牌胜率</div><div class="v">${((s.winRate ?? 0) * 100).toFixed(1)}%</div><div class="sub">${esc(s.brandWins ?? 0)} / ${esc(s.total ?? 0)} 题</div></div>
+  <div class="card"><div class="k">竞品独占</div><div class="v" style="color:#f87171">${esc(s.competitorWins ?? 0)}</div><div class="sub">需要抢回来的问题</div></div>
+  <div class="card"><div class="k">双方都提</div><div class="v">${esc(s.both ?? 0)}</div><div class="sub">正面竞争</div></div>
+  <div class="card"><div class="k">都没提</div><div class="v">${esc(s.neither ?? 0)}</div><div class="sub">空白机会</div></div>
+</div>
+
+<h2>需要抢回来的问题</h2>
+${
+    gaps
+      ? `<table><thead><tr><th>问题</th><th>竞品（被 AI 提到）</th></tr></thead><tbody>${gaps}</tbody></table>`
+      : `<div class="card empty">本期没有竞品独占的问题</div>`
+  }
+
+<h2>我们的优势问题</h2>
+${strengths ? `<div class="card"><ul style="margin:0;padding-left:20px;line-height:1.9">${strengths}</ul></div>` : '<div class="card empty">无</div>'}
 `,
   });
 }

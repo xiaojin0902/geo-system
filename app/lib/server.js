@@ -48,7 +48,10 @@ import {
   layout,
   loginPage,
   agentPage,
+  alertsPage,
+  attributionPage,
   billingPage,
+  comparePage,
   responsesPage,
   setNavPolicy,
   setTheme,
@@ -112,6 +115,55 @@ function subscriptionOf(slug) {
       }
     }
   }
+}
+
+/**
+ * 取某轮（缺省取最新有分的一轮）的分析快照，带上一轮用于环比。
+ * 三个分析页（异动/归因/对位）都用这一份，避免各自重复实现口径。
+ */
+function snapshotOf(slug, requestedRunId = null) {
+  const state = collectState(slug);
+  const fallback = state.runs.find((run) => run.total !== null) ?? state.runs[0] ?? null;
+  const runId = Number.isFinite(Number(requestedRunId)) && Number(requestedRunId) > 0
+    ? Number(requestedRunId)
+    : (fallback ? fallback.runId : null);
+  const snapshot = { state, runId, insights: null, previous: null, rows: [], contents: [], publications: [], settings: {} };
+  if (!runId || !fs.existsSync(dbPath())) return snapshot;
+  let store = null;
+  try {
+    store = openStore(dbPath());
+    const detail = store.getRunDetail(runId);
+    if (detail) {
+      snapshot.rows = detail.rows;
+      snapshot.insights = analyzeRun({ brand: detail.brand, rows: detail.rows });
+      snapshot.insights.score = store.getScore(runId);
+      const brandRow = store.getBrand(slug);
+      if (brandRow) {
+        snapshot.settings = store.listSettings(brandRow.id);
+        snapshot.contents = store.listContents(brandRow.id);
+        snapshot.publications = store.listPublications ? store.listPublications(brandRow.id) : [];
+      }
+      const prevRow = state.runs.find((run) => run.runId !== runId);
+      if (prevRow) {
+        const prevDetail = store.getRunDetail(prevRow.runId);
+        if (prevDetail) {
+          snapshot.previous = analyzeRun({ brand: prevDetail.brand, rows: prevDetail.rows });
+          snapshot.previous.score = store.getScore(prevRow.runId);
+        }
+      }
+    }
+  } catch {
+    /* 快照失败按空处理 */
+  } finally {
+    if (store) {
+      try {
+        store.close();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return snapshot;
 }
 
 function collectState(slug) {
@@ -912,6 +964,42 @@ async function handle(req, res, slug, auth = null) {
       }
     }
     return html(res, 200, distributionPage({ brand: state.brand, channels, contents, publications }));
+  }
+
+  // ---------------------------------------------------------- 异动告警
+  if (req.method === 'GET' && pathname === '/alerts') {
+    const snapshot = snapshotOf(slug, url.searchParams.get('run'));
+    const alertsMod = await import('./alerts.js');
+    const result = alertsMod.evaluateAlerts({
+      brand: snapshot.state.brand,
+      current: snapshot.insights,
+      previous: snapshot.previous,
+      settings: snapshot.settings,
+      runId: snapshot.runId,
+    });
+    return html(res, 200, alertsPage({ brand: snapshot.state.brand, result, runId: snapshot.runId, runs: snapshot.state.runs }));
+  }
+
+  // ---------------------------------------------------------- 内容归因
+  if (req.method === 'GET' && pathname === '/attribution') {
+    const snapshot = snapshotOf(slug, url.searchParams.get('run'));
+    const attributionMod = await import('./attribution.js');
+    const report = attributionMod.buildAttribution({
+      brand: snapshot.state.brand,
+      rows: snapshot.rows,
+      contents: snapshot.contents,
+      publications: snapshot.publications,
+    });
+    return html(res, 200, attributionPage({ brand: snapshot.state.brand, report, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+  }
+
+  // ---------------------------------------------------------- 竞品对位
+  if (req.method === 'GET' && pathname === '/compare') {
+    const snapshot = snapshotOf(slug, url.searchParams.get('run'));
+    const compareMod = await import('./compare.js');
+    const competitors = (snapshot.state.brand.competitors ?? []).map((c) => (typeof c === 'string' ? c : c?.name)).filter(Boolean);
+    const report = compareMod.buildComparison({ brand: snapshot.state.brand, rows: snapshot.rows, competitors });
+    return html(res, 200, comparePage({ brand: snapshot.state.brand, report, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
   }
 
   // ---------------------------------------------------------- 回答浏览器

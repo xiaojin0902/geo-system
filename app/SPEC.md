@@ -484,6 +484,14 @@ CLI：`geo agent --add/--list/--report`、`geo client ... --agent <代理>`。
 原先散落在 28 处的「恒野 GEO」全部改为变量引用（报告、周报、报价、brief、robots/llms、写入器提示、CLI 抬头、登录页、设置页占位）。
 优先级：设置页 `app_title`/`logo_text` > 环境变量 > 内置默认值。改名不再需要改代码。
 
+## 3.38 异动告警 / 内容归因 / 竞品对位（2026-10-27 追加）
+
+- `lib/alerts.js`：两轮环比评估（mention_drop / score_drop / own_citation_lost/gained / competitor_surge / same_name_threat / low_samples / baseline），
+  阈值 `alert_mention_drop_pt`、`alert_score_drop`、`alert_competitor_gain_pt`、`alert_min_samples`；`renderAlertsMarkdown`、`shouldNotify`（纯提示不推送）。
+- `lib/attribution.js`：URL 精确/前缀归一化匹配、自有域名识别、内容贡献榜、自有未绑定引用、引用源 Top。
+- `lib/compare.js`：按问题级别判断本品牌/竞品是否被提，输出胜率、缺口（竞品独占）、优势问题。
+- 页面 `/alerts` `/attribution` `/compare`；CLI `geo alerts|attribution|compare`；告警支持 `--push` 或 `ALERT_WEBHOOK`。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json
