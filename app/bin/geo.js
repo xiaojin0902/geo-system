@@ -40,6 +40,7 @@ const HELP = `
   weekly     生成客户周报（对比上一轮），可推送到 webhook
   client     开通/续费客户订阅（自助版 / 托管版）
   agent      代理管理：开通代理、分配客户、查看分成
+  bill       托管结算单：按效果计量（新增提及/引用/提及率/推荐次数）
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -76,6 +77,7 @@ const HELP = `
   node bin/geo.js client --list
   node bin/geo.js agent --add --username 代理 --password 密码 --name 名称 --quota 5000
   node bin/geo.js agent --list | --report --username 代理
+  node bin/geo.js bill --brand <客户> [--month 2026-10] [--baseline-run <id>] [--json]
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -1627,7 +1629,17 @@ async function cmdAeo(flags) {
   try {
     brand = JSON.parse(fs.readFileSync(brandPath(slug), 'utf8'));
   } catch {
-    throw new CliError(`读不到品牌配置 brands/${slug}.json`, ['先跑：node bin/geo.js init --brand ' + slug]);
+    // 页面新建的客户只有数据库记录，没有 brands/*.json；这里回落到数据库
+    await withStore(async (store) => {
+      const row = store.getBrand(slug);
+      if (row) brand = row;
+      return 0;
+    });
+    if (!brand?.name) {
+      throw new CliError(`读不到品牌配置 brands/${slug}.json，数据库里也没有「${slug}」`, [
+        '页面建客户：/clients；或命令行初始化：node bin/geo.js init --brand ' + slug,
+      ]);
+    }
   }
 
   const baseUrl =
@@ -1782,7 +1794,17 @@ async function cmdQuestions(flags) {
   try {
     brand = JSON.parse(fs.readFileSync(brandPath(slug), 'utf8'));
   } catch {
-    throw new CliError(`读不到品牌配置 brands/${slug}.json`, ['先跑：node bin/geo.js init --brand ' + slug]);
+    // 页面新建的客户只有数据库记录，没有 brands/*.json；回落到数据库
+    await withStore(async (store) => {
+      const row = store.getBrand(slug);
+      if (row) brand = row;
+      return 0;
+    });
+    if (!brand?.name) {
+      throw new CliError(`读不到品牌配置 brands/${slug}.json，数据库里也没有「${slug}」`, [
+        '页面建客户：/clients；或命令行初始化：node bin/geo.js init --brand ' + slug,
+      ]);
+    }
   }
 
   const count = intFlag(flags.count, 'count', 24);
@@ -2641,6 +2663,16 @@ async function cmdClient(flags) {
     store.setSetting('plan', plan.id, brand.id);
     store.setSetting('quota_questions', String(plan.quotaQuestions), brand.id);
     store.setSetting('expire_at', expireAt, brand.id);
+    // 托管默认按效果计费（客户可改口径与价格）
+    if (mode === 'managed') {
+      store.setSetting('billing_mode', 'performance', brand.id);
+      if (!store.getSetting('billing_unit', brand.id)) store.setSetting('billing_unit', 'mention_gain', brand.id);
+      if (!store.getSetting('billing_price', brand.id)) store.setSetting('billing_price', '80', brand.id);
+      if (!store.getSetting('billing_min', brand.id)) store.setSetting('billing_min', '0', brand.id);
+      if (!store.getSetting('billing_cap', brand.id)) store.setSetting('billing_cap', '0', brand.id);
+    } else {
+      store.setSetting('billing_mode', 'fixed', brand.id);
+    }
     store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'subscription_open', detail: `${mode}/${plan.id}/${days}天` });
 
     const sub = plansMod.resolveSubscription(store.listSettings(brand.id));
@@ -2744,6 +2776,94 @@ async function cmdAgent(flags) {
         String(agent.createdAt).slice(0, 10),
       ]),
     );
+    return 0;
+  });
+}
+
+
+/** 托管结算单：按效果计费，口径可复算，输出可发客户的 Markdown。 */
+async function cmdBill(flags) {
+  const slug = brandSlug(flags);
+  let billingMod;
+  try {
+    billingMod = await import('../lib/billing.js');
+  } catch (error) {
+    throw new CliError('计费模块不可用（lib/billing.js）', [`详情：${error?.message ?? error}`]);
+  }
+  const month = stringFlag(flags.month, 'month') ?? new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/u.test(month)) throw new CliError(`--month 格式应为 YYYY-MM，收到「${month}」`);
+
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+    const settings = store.listSettings(brand.id);
+
+    const inMonth = (iso, target) => String(iso ?? '').slice(0, 7) === target;
+    const runs = store.listRuns(brand.id, 500);
+    const monthRuns = runs.filter((run) => inMonth(run.startedAt, month));
+    const prevMonth = (() => {
+      const [y, m] = month.split('-').map(Number);
+      const d = new Date(Date.UTC(y, m - 2, 1));
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    })();
+
+    const rowsOf = (list) => {
+      const out = [];
+      for (const run of list) {
+        const detail = store.getRunDetail(run.id);
+        if (detail) out.push(...detail.rows);
+      }
+      return out;
+    };
+
+    const currentRows = rowsOf(monthRuns);
+    if (!currentRows.length) {
+      throw new CliError(`${month} 没有可结算的回答数据`, ['先跑一轮诊断，或换一个月份：--month 2026-09']);
+    }
+
+    const baselineRunId = intFlag(flags['baseline-run'] ?? flags.baselineRun, 'baseline-run', undefined);
+    let baseRows = [];
+    let baselineLabel = '未设置基线（按 0 计）';
+    if (baselineRunId) {
+      const detail = store.getRunDetail(baselineRunId);
+      if (!detail) throw new CliError(`基线运行 #${baselineRunId} 不存在`);
+      baseRows = detail.rows;
+      baselineLabel = `指定基线 run #${baselineRunId}`;
+    } else {
+      const prevRuns = runs.filter((run) => inMonth(run.startedAt, prevMonth));
+      if (prevRuns.length) {
+        baseRows = rowsOf(prevRuns);
+        baselineLabel = `上期（${prevMonth}）同口径`;
+      } else if (monthRuns.length > 1) {
+        // 没有上月数据：用本月第一轮当基线，只对「首轮之后涨出来的部分」收费
+        const first = monthRuns[monthRuns.length - 1];
+        const firstDetail = store.getRunDetail(first.id);
+        if (firstDetail) {
+          baseRows = firstDetail.rows;
+          baselineLabel = `本月首轮（run #${first.id}）基线`;
+        }
+      }
+    }
+
+    const settlement = billingMod.computeSettlement({
+      brand,
+      current: billingMod.measureRows(currentRows),
+      baseline: billingMod.measureRows(baseRows),
+      settings,
+      month,
+      baselineLabel,
+    });
+    const markdown = billingMod.renderSettlementMarkdown(settlement);
+    const dir = path.join(DATA_DIR, 'reports');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `bill-${slug}-${month}.md`);
+    fs.writeFileSync(file, markdown, 'utf8');
+
+    if (flags.json) {
+      console.log(JSON.stringify({ settlement, file }, null, 2));
+      return 0;
+    }
+    console.log(markdown);
+    console.log(`已写入：${file}`);
     return 0;
   });
 }
@@ -2922,6 +3042,7 @@ const HANDLERS = {
   weekly: cmdWeekly,
   client: cmdClient,
   agent: cmdAgent,
+  bill: cmdBill,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

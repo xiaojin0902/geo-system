@@ -470,6 +470,14 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 `/clients` 仅返回自己客户，新建客户自动绑定自己；订阅接口只允许给自己客户开通；`/settings` `/audit-log` 一律 403。
 CLI：`geo agent --add/--list/--report`、`geo client ... --agent <代理>`。
 
+## 3.36 托管按效果计费（2026-10-26 追加）
+
+`lib/billing.js`：`BILLING_UNITS`（mention_gain/citation_gain/mention_rate_pt/recommended_count）、
+`measureRows`（口径统计，无效样本不进分母）、`computeSettlement`（基线对比 + 保底 + 封顶）、`renderSettlementMarkdown`。
+设置键：`billing_mode`（performance/fixed）、`billing_unit`、`billing_price`、`billing_min`、`billing_cap`。
+执行：`geo bill`（写 data/reports/bill-<slug>-<month>.md）、`/billing` 看板（服务商/代理）。
+开通托管时自动写入 performance 默认口径；效果为负按 0 计。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

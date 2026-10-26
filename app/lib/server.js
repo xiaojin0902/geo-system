@@ -47,6 +47,7 @@ import {
   layout,
   loginPage,
   agentPage,
+  billingPage,
   responsesPage,
   setNavPolicy,
   setTheme,
@@ -433,7 +434,7 @@ async function handle(req, res, slug, auth = null) {
       }
     }
     setNavPolicy({ canAct: true, role: 'agent' });
-    const allowed = ['/agent', '/clients', '/logout', '/login'];
+    const allowed = ['/agent', '/clients', '/billing', '/logout', '/login'];
     const requested = String(url.searchParams.get('brand') ?? '').trim();
     const target = brands.find((b) => b.slug === requested) ?? brands[0] ?? null;
     if (!target) {
@@ -452,6 +453,79 @@ async function handle(req, res, slug, auth = null) {
         return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1><div class="sub">该页面仅服务商可用。</div>' }));
       }
     }
+  }
+
+  // ---------------------------------------------------------- 托管结算看板
+  if (req.method === 'GET' && pathname === '/billing') {
+    if (actor?.role !== 'admin' && actor?.role !== 'agent') {
+      return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1><div class="sub">该页面仅服务商与代理可用。</div>' }));
+    }
+    const month = String(url.searchParams.get('month') ?? new Date().toISOString().slice(0, 7));
+    const inMonth = (iso, target) => String(iso ?? '').slice(0, 7) === target;
+    const prevMonth = (() => {
+      const [y, m] = month.split('-').map(Number);
+      const d = new Date(Date.UTC(y, m - 2, 1));
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    })();
+    let rows = [];
+    let store = null;
+    try {
+      store = openStore(dbPath());
+      const billingMod = await import('./billing.js');
+      const brands = actor?.role === 'agent' ? store.listBrandsByAgent(actor.username) : store.listBrands();
+      for (const brand of brands) {
+        const settings = store.listSettings(brand.id);
+        if (settings.billing_mode === 'fixed') continue;
+        if (settings.plan === undefined && settings.billing_unit === undefined) continue; // 未开托管
+        const runs = store.listRuns(brand.id, 500);
+        const monthRuns = runs.filter((run) => inMonth(run.startedAt, month));
+        if (!monthRuns.length) continue;
+        const rowsOf = (list) => {
+          const out = [];
+          for (const run of list) {
+            const detail = store.getRunDetail(run.id);
+            if (detail) out.push(...detail.rows);
+          }
+          return out;
+        };
+        const baseRuns = runs.filter((run) => inMonth(run.startedAt, prevMonth));
+        const settlement = billingMod.computeSettlement({
+          brand,
+          current: billingMod.measureRows(rowsOf(monthRuns)),
+          baseline: billingMod.measureRows(rowsOf(baseRuns)),
+          settings,
+          month,
+          baselineLabel: baseRuns.length ? `上期（${prevMonth}）同口径` : '未设置基线（按 0 计）',
+        });
+        rows.push({
+          slug: brand.slug,
+          name: brand.name,
+          mode: settings.service_mode ?? 'managed',
+          modeName: settings.service_mode === 'self_service' ? '自助版' : '托管版',
+          unitName: settlement.unitName,
+          unitLabel: settlement.unitLabel,
+          quantity: settlement.quantity,
+          price: settlement.price,
+          total: settlement.total,
+          currentAnswers: settlement.current.answers,
+          currentMentioned: settlement.current.mentioned,
+          floored: settlement.floored,
+          capped: settlement.capped,
+        });
+      }
+    } catch {
+      rows = [];
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    const total = rows.reduce((sum, row) => sum + row.total, 0);
+    return html(res, 200, billingPage({ rows, month, total, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
   }
 
   // 代理总览页
@@ -1087,6 +1161,17 @@ async function handle(req, res, slug, auth = null) {
         rejectedNames: [],
         competitors: [],
       });
+      // 自动生成种子题目：新客户开箱即可跑诊断（不用再跑 CLI init）
+      try {
+        const genMod = await import('./questions-gen.js');
+        const brandRow = store.getBrand(slug);
+        const generated = genMod.generateQuestions({ brand: brandRow, count: 36, seed: 1 });
+        if (generated.questions?.length) {
+          store.seedQuestions(brandRow.id, generated.questions);
+        }
+      } catch {
+        /* 题目生成失败不阻断建客户 */
+      }
       store.writeAudit({ actor: actor.username, brandSlug: slug, action: 'client_create', detail: name });
       return json(res, 200, { ok: true, client: { slug, name } });
     } catch (error) {

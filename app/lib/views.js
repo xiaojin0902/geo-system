@@ -1235,6 +1235,49 @@ ${
 }
 
 /**
+ * 结算看板：按效果计费的托管客户，本月应结多少。
+ * 核心信息只有三个：用哪个口径、涨了多少、应收多少。
+ */
+export function billingPage({ rows = [], month = '', total = 0, generatedAt = '' } = {}) {
+  const body = `
+<h1>托管结算看板</h1>
+<div class="sub">${esc(month)} · 按效果计费（可持续复算）· 生成于 ${esc(generatedAt)}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">结算客户</div><div class="v">${esc(rows.length)}</div><div class="sub">托管版客户</div></div>
+  <div class="card"><div class="k">本月应收合计</div><div class="v">¥${esc(total)}</div><div class="sub">按各客户口径</div></div>
+  <div class="card"><div class="k">计费口径</div><div class="v" style="font-size:15px">${esc(rows[0]?.unitName ?? '—')}</div><div class="sub">可在设置里调整</div></div>
+  <div class="card"><div class="k">结算月份</div><div class="v" style="font-size:18px">${esc(month)}</div><div class="sub">--month 可切换</div></div>
+</div>
+
+<div class="hint">托管 = 按效果收费：只对「本期相对基线的增量」计费，效果为负时不收费；支持保底与封顶，避免双方吃亏。
+客户可在看板核对每一个数字。</div>
+
+${
+    rows.length
+      ? `<table><thead><tr><th>客户</th><th>模式</th><th>口径</th><th>本期</th><th>增量</th><th>单价</th><th>应收</th><th></th></tr></thead><tbody>
+        ${rows
+          .map(
+            (row) => `<tr>
+            <td><b>${esc(row.name)}</b><div class="sub mono">${esc(row.slug)}</div></td>
+            <td><span class="badge ${row.mode === 'managed' ? 'info' : 'mut'}">${esc(row.modeName)}</span></td>
+            <td class="sub">${esc(row.unitName)}</td>
+            <td class="mono">${esc(row.currentMentioned)} 提及 / ${esc(row.currentAnswers)} 答</td>
+            <td class="mono">${esc(row.quantity)} ${esc(row.unitLabel)}</td>
+            <td class="mono">¥${esc(row.price)}</td>
+            <td class="mono"><b>¥${esc(row.total)}</b>${row.floored ? ' <span class="badge warn">保底</span>' : ''}${row.capped ? ' <span class="badge warn">封顶</span>' : ''}</td>
+            <td><a href="/?brand=${encodeURIComponent(row.slug)}" style="color:#b6a4ff">看板</a></td>
+          </tr>`,
+          )
+          .join('')}
+      </tbody></table>`
+      : `<div class="card empty">还没有需要结算的托管客户（托管客户开通后会自动按效果计费）。</div>`
+  }
+`;
+  return layout({ title: '结算看板', active: '/billing', body });
+}
+
+/**
  * 客户列表（仅管理员）：一屏看所有客户的最新分数与账号。
  */
 export function clientsPage({ clients = [], plans = [], generatedAt = '' } = {}) {
