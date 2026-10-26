@@ -430,6 +430,12 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 `geo distribute` 支持单条或 `--all` 批量投递，默认 dry_run 出回执，`--live` 且渠道为 api 态才真正发布；
 `store.listPublications()` 提供矩阵数据，控制台 `/distribution` 渲染「内容 × 渠道」覆盖矩阵与缺口提示。
 
+## 3.31 客户分享链接（2026-10-26 追加）
+
+`shares` 表 + `store.createShare/getShare/revokeShare/listShares`；`geo share` 生成/列出/吊销；
+服务端 `/s/<token>` 免 Basic Auth 渲染只读报告（过期或吊销返回 404 页面）。
+语义：`days=0` 为长期，负数即已过期；重复吊销返回 false。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

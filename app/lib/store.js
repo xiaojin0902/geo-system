@@ -138,6 +138,18 @@ CREATE TABLE IF NOT EXISTS publications (
 );
 CREATE INDEX IF NOT EXISTS idx_publications_content ON publications(content_id);
 
+-- 分享链接：给客户看的只读报告（token 即凭证，可设到期时间与吊销）
+CREATE TABLE IF NOT EXISTS shares (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token TEXT NOT NULL UNIQUE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  run_id INTEGER,
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  revoked INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_shares_brand ON shares(brand_id);
+
 CREATE TABLE IF NOT EXISTS monitoring (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
@@ -747,6 +759,64 @@ export class Store {
       status: row.status,
       createdAt: row.created_at,
       title: row.title,
+    }));
+  }
+
+  // ----------------------------------------------------------- shares（客户分享链接）
+
+  /** 新建分享链接，返回 token（32 位随机十六进制） */
+  createShare({ brandId, runId = null, days = 30 } = {}) {
+    const crypto = globalThis.crypto;
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const token = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const now = new Date();
+    const expires = days === 0 ? null : new Date(now.getTime() + days * 86400000).toISOString();
+    this.#stmt(
+      'INSERT INTO shares (token, brand_id, run_id, created_at, expires_at, revoked) VALUES (?,?,?,?,?,0)',
+    ).run(token, Number(brandId), runId === null ? null : Number(runId), now.toISOString(), expires);
+    return { token, expiresAt: expires, createdAt: now.toISOString() };
+  }
+
+  /** 按 token 取分享记录（含品牌），过期或吊销返回 null */
+  getShare(token) {
+    const row = this.#stmt(
+      `SELECT s.*, b.slug AS brand_slug, b.name AS brand_name
+         FROM shares s JOIN brands b ON b.id = s.brand_id
+        WHERE s.token = ?`,
+    ).get(String(token ?? ''));
+    if (!row) return null;
+    if (Number(row.revoked) === 1) return null;
+    if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return null;
+    return {
+      id: Number(row.id),
+      token: row.token,
+      brandId: Number(row.brand_id),
+      brandSlug: row.brand_slug,
+      brandName: row.brand_name,
+      runId: row.run_id === null ? null : Number(row.run_id),
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+    };
+  }
+
+  /** 吊销分享链接 */
+  revokeShare(token) {
+    return this.#stmt('UPDATE shares SET revoked = 1 WHERE token = ? AND revoked = 0').run(String(token ?? '')).changes > 0;
+  }
+
+  /** 列出某品牌的分享链接 */
+  listShares(brandId) {
+    return this.#stmt(
+      `SELECT id, token, run_id, created_at, expires_at, revoked
+         FROM shares WHERE brand_id = ? ORDER BY id DESC`,
+    ).all(Number(brandId)).map((row) => ({
+      id: Number(row.id),
+      token: row.token,
+      runId: row.run_id === null ? null : Number(row.run_id),
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      revoked: Number(row.revoked) === 1,
     }));
   }
 

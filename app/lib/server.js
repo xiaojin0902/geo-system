@@ -18,6 +18,14 @@ import { APP_ROOT, DATA_DIR, brandPath, dbPath } from './config.js';
 import { engineHasKey, listEngines } from './engines/index.js';
 import { openStore } from './store.js';
 import { runDoctor } from './doctor.js';
+
+/** 页面里拼接品牌名等用户可控文本时的最小转义 */
+const escHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 import { analyzeRun } from './analytics.js';
 import {
   auditPage,
@@ -252,7 +260,9 @@ function checkAuth(req, auth) {
 }
 
 async function handle(req, res, slug, auth = null) {
-  if (!checkAuth(req, auth)) {
+  // 客户分享链接（/s/<token>）自带凭证，不再走 Basic Auth
+  const isSharePath = String(req.url ?? '').startsWith('/s/');
+  if (!isSharePath && !checkAuth(req, auth)) {
     res.writeHead(401, { 'www-authenticate': 'Basic realm="Hengye GEO", charset="UTF-8"' });
     res.end('需要登录');
     return;
@@ -526,6 +536,59 @@ async function handle(req, res, slug, auth = null) {
       }
     }
     return html(res, 200, distributionPage({ brand: state.brand, channels, contents, publications }));
+  }
+
+  // ---------------------------------------------------------- 客户分享链接
+  if (req.method === 'GET' && pathname.startsWith('/s/')) {
+    const token = pathname.slice(3).trim();
+    let share = null;
+    let insights = null;
+    let brand = { name: '恒野' };
+    let runMeta = null;
+    if (token && fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        share = store.getShare(token);
+        if (share) {
+          const brandRow = store.getBrand(share.brandSlug);
+          if (brandRow) brand = brandRow;
+          const runId = share.runId;
+          if (runId) {
+            const detail = store.getRunDetail(runId);
+            if (detail) {
+              insights = analyzeRun({ brand: detail.brand, rows: detail.rows });
+              runMeta = store.listRuns(brandRow.id, 200).find((r) => r.runId === runId) ?? null;
+            }
+          }
+        }
+      } catch {
+        share = null;
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    if (!share) {
+      return html(
+        res,
+        404,
+        layout({
+          title: '链接已失效',
+          body: `<h1>链接已失效</h1><div class="sub">这个分享链接不存在、已过期或被撤销。请联系你的服务商重新生成。</div>`,
+        }),
+      );
+    }
+    const page = insightsPage({ brand, runs: runMeta ? [runMeta] : [], runId: share.runId, insights });
+    const banner = `<div class="hint" style="border-color:#22d3ee;background:rgba(34,211,238,.08)">
+      客户分享视图 · 只读 · 品牌「${escHtml(brand.name ?? '')}」· 到期 ${escHtml(String(share.expiresAt ?? '长期').slice(0, 10))}
+    </div>`;
+    return html(res, 200, page.replace('<h1>', banner + '<h1>'));
   }
 
   if (req.method === 'GET' && pathname === '/cockpit') {

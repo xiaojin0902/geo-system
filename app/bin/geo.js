@@ -36,6 +36,7 @@ const HELP = `
   video      把内容转成短视频脚本（口播/分镜/标题/话题/合规）
   seo        传统 SEO + 短视频 SEO 体检（对标摘星AI 三位一体）
   distribute 内容矩阵分发：把内容批量投到多个渠道（dry_run / 真实 API）
+  share      客户分享链接：生成只读报告链接（可设到期，可吊销）
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -65,6 +66,8 @@ const HELP = `
   node bin/geo.js video --content <id> [--style 口播科普] [--duration 60] [--json]
   node bin/geo.js seo --url <网址> [--keyword <词>] [--json]
   node bin/geo.js distribute --content <id> [--channels 知乎,头条] [--all] [--live] [--json]
+  node bin/geo.js share --run <id> [--days 30] [--base https://你的域名] [--json]
+  node bin/geo.js share --list | --revoke <token>
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -2437,6 +2440,65 @@ async function cmdDistribute(flags) {
   });
 }
 
+
+/** 客户分享链接：给客户看的只读报告（token 即凭证，可到期与吊销）。 */
+async function cmdShare(flags) {
+  const slug = brandSlug(flags);
+  return withStore(async (store) => {
+    const brand = requireBrand(store, slug);
+
+    if (flags.revoke) {
+      const token = stringFlag(flags.revoke, 'revoke');
+      const ok = store.revokeShare(token);
+      console.log(ok ? `已吊销：${token.slice(0, 8)}…` : `没找到该链接：${token.slice(0, 8)}…`);
+      return ok ? 0 : 1;
+    }
+
+    if (flags.list) {
+      const shares = store.listShares(brand.id);
+      if (!shares.length) {
+        console.log('还没有分享链接。用：node bin/geo.js share --run <id> --days 30');
+        return 0;
+      }
+      if (flags.json) {
+        console.log(JSON.stringify(shares, null, 2));
+        return 0;
+      }
+      printTable(
+        ['token', '运行', '创建', '到期', '状态'],
+        shares.map((item) => [
+          `${item.token.slice(0, 10)}…`,
+          item.runId === null ? '最新' : `#${item.runId}`,
+          String(item.createdAt).slice(0, 10),
+          item.expiresAt ? String(item.expiresAt).slice(0, 10) : '长期',
+          item.revoked ? '已吊销' : '有效',
+        ]),
+      );
+      return 0;
+    }
+
+    const runId = intFlag(flags.run, 'run', undefined);
+    const days = intFlag(flags.days, 'days', 30);
+    const created = store.createShare({ brandId: brand.id, runId: runId ?? null, days });
+    const base = (stringFlag(flags.base, 'base') ?? process.env.GEO_PUBLIC_URL ?? '').replace(/\/+$/u, '');
+    const url = base ? `${base}/s/${created.token}` : `/s/${created.token}`;
+
+    if (flags.json) {
+      console.log(JSON.stringify({ ...created, url }, null, 2));
+      return 0;
+    }
+    console.log('✔ 分享链接已生成（只读，客户免登录可看）');
+    console.log(`  链接：${url}`);
+    if (!base) {
+      console.log('  提示：没配 GEO_PUBLIC_URL 也没传 --base，给出的是相对路径；');
+      console.log('        部署后用：node bin/geo.js share --run <id> --base https://你的域名');
+    }
+    console.log(`  运行：${runId === null ? '该品牌最新一轮' : `#${runId}`} · 到期：${created.expiresAt ? created.expiresAt.slice(0, 10) : '长期'}`);
+    console.log(`  吊销：node bin/geo.js share --revoke ${created.token}`);
+    return 0;
+  });
+}
+
 // ---------------------------------------------------- doctor / audit / serve
 // 这三个命令解决的是「装完之后怎么用起来」，不是采集主链路，因此单独成段。
 
@@ -2607,6 +2669,7 @@ const HANDLERS = {
   video: cmdVideo,
   seo: cmdSeo,
   distribute: cmdDistribute,
+  share: cmdShare,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

@@ -113,6 +113,7 @@ node bin/geo.js diagnose --brand hengye --engines live --limit 30
 | `node bin/geo.js quote --keywords "词:难度,..." [--band lite\|standard\|deep] [--tax 0.06]` | 报价：关键词价值分 → 篇数 × 单价 → 成本构成与毛利 |
 | `node bin/geo.js video --content <id> [--style 口播科普] [--duration 60]` | 内容 → 短视频脚本（口播/分镜/标题/话题/合规） |
 | `node bin/geo.js seo --url <网址> [--keyword <词>]` | 传统 SEO + 短视频 SEO 体检（对标三位一体） |
+| `node bin/geo.js share --run <id> [--days 30] [--base https://域名]` | 生成客户只读分享链接（免登录、可到期、可吊销） |
 | `node bin/geo.js distribute --content <id> [--channels 知乎专栏,今日头条] [--all] [--live]` | 内容矩阵分发：一条内容投 11 个渠道（默认 dry_run，配 webhook 才真发） |
 | `node bin/geo.js plan [--run <id>]` | Top10 行动 + 30 天计划（每行动带证据、owner、时限） |
 | `node bin/geo.js schedule [--write]` | 生成 crontab 定时任务（每日监测 / 每周诊断 / 每月体检），`--write` 出安装脚本 |
