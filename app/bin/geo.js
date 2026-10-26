@@ -38,6 +38,7 @@ const HELP = `
   distribute 内容矩阵分发：把内容批量投到多个渠道（dry_run / 真实 API）
   share      客户分享链接：生成只读报告链接（可设到期，可吊销）
   weekly     生成客户周报（对比上一轮），可推送到 webhook
+  client     开通/续费客户订阅（自助版 / 托管版）
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -70,6 +71,8 @@ const HELP = `
   node bin/geo.js share --run <id> [--days 30] [--base https://你的域名] [--json]
   node bin/geo.js share --list | --revoke <token>
   node bin/geo.js weekly --brand hengye [--push <webhook>] [--json]
+  node bin/geo.js client --slug <客户> --mode managed --plan pro --days 30
+  node bin/geo.js client --list
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -2566,6 +2569,83 @@ async function cmdWeekly(flags) {
   });
 }
 
+
+/** 客户订阅：开通/续费/查看（自助版 vs 托管版）。 */
+async function cmdClient(flags) {
+  let plansMod;
+  try {
+    plansMod = await import('../lib/plans.js');
+  } catch (error) {
+    throw new CliError('套餐模块不可用（lib/plans.js）', [`详情：${error?.message ?? error}`]);
+  }
+  return withStore(async (store) => {
+    if (flags.list) {
+      const rows = store.listBrands().map((brand) => {
+        const sub = plansMod.resolveSubscription(store.listSettings(brand.id));
+        return {
+          slug: brand.slug,
+          name: brand.name,
+          mode: sub.modeName,
+          plan: sub.planName,
+          quota: sub.quotaQuestions,
+          expireAt: sub.expireAt,
+          expired: sub.expired,
+          active: sub.active,
+        };
+      });
+      if (flags.json) {
+        console.log(JSON.stringify(rows, null, 2));
+        return 0;
+      }
+      if (!rows.length) {
+        console.log('还没有客户。用：node bin/geo.js client --slug <客户> --mode managed --plan pro --days 30');
+        return 0;
+      }
+      printTable(
+        ['客户', '名称', '模式', '套餐', '配额', '到期', '状态'],
+        rows.map((row) => [
+          row.slug,
+          row.name,
+          row.mode,
+          row.plan,
+          String(row.quota),
+          row.expireAt ? row.expireAt.slice(0, 10) : '—',
+          row.expired ? '已到期' : row.active ? '有效' : '未开通',
+        ]),
+      );
+      return 0;
+    }
+
+    const slug = stringFlag(flags.slug, 'slug') ?? brandSlug(flags);
+    const brand = requireBrand(store, slug);
+    const planId = stringFlag(flags.plan, 'plan') ?? 'basic';
+    const mode = stringFlag(flags.mode, 'mode') ?? 'self_service';
+    const days = intFlag(flags.days, 'days', 30);
+    const plan = plansMod.planOf(planId);
+    if (!plan) throw new CliError(`未知套餐「${planId}」`, [`可用：${plansMod.PLANS.map((p) => `${p.id}（${p.name} ¥${p.priceMonthly}/月）`).join('、')}`]);
+    if (!['self_service', 'managed'].includes(mode)) throw new CliError(`模式只能是 self_service 或 managed，收到「${mode}」`);
+
+    const expireAt = new Date(Date.now() + Math.max(1, days) * 86400000).toISOString();
+    store.setSetting('service_mode', mode, brand.id);
+    store.setSetting('plan', plan.id, brand.id);
+    store.setSetting('quota_questions', String(plan.quotaQuestions), brand.id);
+    store.setSetting('expire_at', expireAt, brand.id);
+    store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'subscription_open', detail: `${mode}/${plan.id}/${days}天` });
+
+    const sub = plansMod.resolveSubscription(store.listSettings(brand.id));
+    if (flags.json) {
+      console.log(JSON.stringify(sub, null, 2));
+      return 0;
+    }
+    console.log('✔ 订阅已开通');
+    console.log(`  客户：${brand.name}（${slug}）`);
+    console.log(`  模式：${sub.modeName}（${sub.clientCanAct ? '客户可自己跑诊断' : '客户只读，服务商代跑'}）`);
+    console.log(`  套餐：${sub.planName} · ¥${sub.priceMonthly}/月 · 配额 ${sub.quotaQuestions} 题/月`);
+    console.log(`  到期：${sub.expireAt?.slice(0, 10)}`);
+    return 0;
+  });
+}
+
 // ---------------------------------------------------- doctor / audit / serve
 // 这三个命令解决的是「装完之后怎么用起来」，不是采集主链路，因此单独成段。
 
@@ -2738,6 +2818,7 @@ const HANDLERS = {
   distribute: cmdDistribute,
   share: cmdShare,
   weekly: cmdWeekly,
+  client: cmdClient,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

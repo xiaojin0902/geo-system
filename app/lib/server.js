@@ -18,6 +18,7 @@ import { APP_ROOT, DATA_DIR, brandPath, dbPath } from './config.js';
 import { engineHasKey, engineReadiness, getEngine, listEngines } from './engines/index.js';
 import { openStore } from './store.js';
 import { runDoctor } from './doctor.js';
+import { PLANS, resolveSubscription } from './plans.js';
 import {
   actorOf,
   buildCookie,
@@ -46,6 +47,7 @@ import {
   layout,
   loginPage,
   responsesPage,
+  setNavPolicy,
   setTheme,
   clientsPage,
   settingsPage,
@@ -84,6 +86,31 @@ function readBrand(slug) {
 }
 
 /** 尽量只读地汇总控制台需要的数据；数据库不存在时返回空态而不是报错 */
+/**
+ * 读取某客户的订阅状态（套餐/模式/配额/到期）。
+ * 每请求调用一次，读 settings 的 4 个键，成本可忽略。
+ */
+function subscriptionOf(slug) {
+  if (!fs.existsSync(dbPath())) return resolveSubscription({});
+  let store = null;
+  try {
+    store = openStore(dbPath());
+    const brand = store.getBrand(slug);
+    if (!brand) return resolveSubscription({});
+    return resolveSubscription(store.listSettings(brand.id));
+  } catch {
+    return resolveSubscription({});
+  } finally {
+    if (store) {
+      try {
+        store.close();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
 function collectState(slug) {
   const state = {
     brand: readBrand(slug),
@@ -289,6 +316,7 @@ function checkAuth(req, auth) {
 async function handle(req, res, slug, auth = null) {
   const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
   const pathname = decodeURIComponent(url.pathname);
+  setNavPolicy({ canAct: true });
 
   // ---------------------------------------------------------------- 登录与会话
   // 公开路径：健康检查、客户分享链接、登录页、静态图标
@@ -333,9 +361,23 @@ async function handle(req, res, slug, auth = null) {
         return html(res, 403, layout({ title: '未绑定品牌', body: '<h1>账号未绑定品牌</h1><div class="sub">请联系管理员。</div>' }));
       }
       slug = actor.brandSlug;
-      if (!clientCanAccess(pathname)) {
+      // 订阅判断优先：到期 → 只读；托管 → 不能执行动作（给客户明确提示，而不是笼统的「无权访问」）
+      const subscription = subscriptionOf(slug);
+      const isActionApi = pathname.startsWith('/api/') && req.method !== 'GET';
+      if (!clientCanAccess(pathname) && !isActionApi) {
         return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1><div class="sub">该页面仅管理员可用。</div>' }));
       }
+      if (!subscription.active) {
+        if (isActionApi) return json(res, 402, { ok: false, error: '订阅未开通或已到期，请联系服务商续费' });
+        if (!['/', '/cockpit', '/insights', '/weekly', '/audit', '/seo', '/video', '/pipeline', '/responses'].includes(pathname) && !pathname.startsWith('/reports/') && !pathname.startsWith('/run/')) {
+          return html(res, 402, layout({ title: '订阅未开通', body: '<h1>订阅未开通或已到期</h1><div class="sub">请联系服务商续费后继续使用。</div>' }));
+        }
+      }
+      if (!subscription.clientCanAct && isActionApi) {
+        return json(res, 403, { ok: false, error: '当前为托管服务：诊断由服务商代跑，你无需操作' });
+      }
+      // 客户不能执行动作时，导航里隐藏动作类页面
+      setNavPolicy({ canAct: subscription.clientCanAct });
     }
   }
 
@@ -451,6 +493,8 @@ async function handle(req, res, slug, auth = null) {
         ],
         engines: engineStatus(),
         admin: actor?.role === 'admin',
+        subscription: subscriptionOf(slug),
+        role: actor?.role ?? 'admin',
         counts: state.counts,
         demoRuns,
         liveRuns: state.runs.length - demoRuns,
@@ -835,6 +879,7 @@ async function handle(req, res, slug, auth = null) {
         store = openStore(dbPath());
         const users = store.listUsers();
         clients = store.listBrands().map((brand) => {
+          const sub = resolveSubscription(store.listSettings(brand.id));
           const runs = store.listRuns(brand.id, 5);
           const scored = runs.find((run) => run.total !== null) ?? runs[0] ?? null;
           return {
@@ -845,6 +890,14 @@ async function handle(req, res, slug, auth = null) {
             level: scored?.level ?? null,
             lastRunAt: scored?.startedAt ?? null,
             users: users.filter((u) => u.brandSlug === brand.slug).length,
+            modeName: sub.modeName,
+            mode: sub.mode,
+            planName: sub.planName,
+            planId: sub.planId,
+            expired: sub.expired,
+            active: sub.active,
+            expireAt: sub.expireAt,
+            quotaQuestions: sub.quotaQuestions,
           };
         });
       } catch {
@@ -859,7 +912,7 @@ async function handle(req, res, slug, auth = null) {
         }
       }
     }
-    return html(res, 200, clientsPage({ clients, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
+    return html(res, 200, clientsPage({ clients, plans: PLANS, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
   }
 
   if (req.method === 'GET' && pathname === '/settings') {
@@ -934,6 +987,42 @@ async function handle(req, res, slug, auth = null) {
       });
       store.writeAudit({ actor: actor.username, brandSlug: slug, action: 'client_create', detail: name });
       return json(res, 200, { ok: true, client: { slug, name } });
+    } catch (error) {
+      return json(res, 500, { ok: false, error: String(error?.message ?? error) });
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  // 开通/修改订阅（管理员）
+  if (req.method === 'POST' && pathname === '/api/clients/subscription') {
+    if (actor?.role !== 'admin') return json(res, 403, { ok: false, error: '无权操作' });
+    let store = null;
+    try {
+      const body = await readBody(req);
+      const slug = String(body.slug ?? '').trim();
+      const mode = String(body.mode ?? 'self_service');
+      const planId = String(body.plan ?? '').trim();
+      const days = Math.max(1, Math.min(3650, Number(body.days) || 30));
+      const plan = PLANS.find((item) => item.id === planId);
+      if (!plan) return json(res, 400, { ok: false, error: `未知套餐「${planId}」，可用：${PLANS.map((p) => p.id).join('、')}` });
+      if (!['self_service', 'managed'].includes(mode)) return json(res, 400, { ok: false, error: '模式只能是 self_service 或 managed' });
+      store = openStore(dbPath());
+      const brand = store.getBrand(slug);
+      if (!brand) return json(res, 404, { ok: false, error: `客户「${slug}」不存在` });
+      const expireAt = new Date(Date.now() + days * 86400000).toISOString();
+      store.setSetting('service_mode', mode, brand.id);
+      store.setSetting('plan', plan.id, brand.id);
+      store.setSetting('quota_questions', String(plan.quotaQuestions), brand.id);
+      store.setSetting('expire_at', expireAt, brand.id);
+      store.writeAudit({ actor: actor.username, brandSlug: slug, action: 'subscription_open', detail: `${mode}/${plan.id}/${days}天` });
+      return json(res, 200, { ok: true, subscription: resolveSubscription(store.listSettings(brand.id)) });
     } catch (error) {
       return json(res, 500, { ok: false, error: String(error?.message ?? error) });
     } finally {
@@ -1222,7 +1311,8 @@ async function handle(req, res, slug, auth = null) {
         const brandRow = quotaStore.getBrand(slug);
         if (brandRow) {
           const quota = Number(quotaStore.getSetting('quota_questions', brandRow.id) ?? quotaStore.getSetting('quota_questions', null) ?? '0');
-          if (quota > 0) {
+          // 配额是给客户的上限；服务商（admin）自己跑诊断不受限
+          if (quota > 0 && actor?.role === 'client') {
             const monthStart = new Date();
             monthStart.setDate(1);
             monthStart.setHours(0, 0, 0, 0);

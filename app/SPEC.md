@@ -455,6 +455,14 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 3. `buildPhases`：30/60/90 天路线图（认得你 → 引用你 → 份额与防守），渲染在驾驶舱；
 4. `/api/providers`：引擎与就绪状态由后端返回，前端不漂移。
 
+## 3.34 服务模式与套餐（2026-10-26 追加）
+
+`lib/plans.js`：两种模式（`self_service` 自助 / `managed` 托管）+ 三档套餐（basic/pro/agency）。
+订阅状态存在 `settings`（`service_mode` / `plan` / `quota_questions` / `expire_at`）。
+执行：`POST /api/clients/subscription`（管理员）、`geo client`（CLI）、`/clients` 页面开通表单。
+门禁：客户角色下——到期未续费 → 只读（动作接口 402）；托管版 → 执行接口 403 且导航隐藏动作页；
+配额只约束客户，服务商管理员不受限。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

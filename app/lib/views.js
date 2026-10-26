@@ -13,6 +13,15 @@
 // ── 白标主题：布局读取这里的值，服务端每请求按客户设置注入 ──
 let THEME = { title: '恒野 GEO', logo: '恒野 <i>GEO</i>', color: '#7c5cff', footer: '' };
 
+// 动作类页面：客户不能执行时（托管/到期）从导航里隐藏，避免点了才报错
+const ACTION_PATHS = new Set(['/run-diagnose', '/tools', '/distribution', '/pipeline', '/video', '/doctor']);
+let NAV_POLICY = { canAct: true };
+
+/** 设置本请求的导航策略（每请求重置，避免串台） */
+export function setNavPolicy(policy = {}) {
+  NAV_POLICY = { canAct: policy.canAct !== false };
+}
+
 /** 设置进程内主题（白标） */
 export function setTheme(partial = {}) {
   THEME = {
@@ -114,6 +123,7 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
     ['/doctor', '环境自检'],
   ];
   const nav = items
+    .filter(([href]) => NAV_POLICY.canAct || !ACTION_PATHS.has(href))
     .map(([href, label]) => `<a href="${href}" class="${href === active ? 'on' : ''}">${esc(label)}</a>`)
     .join('');
   return `<!DOCTYPE html>
@@ -149,6 +159,8 @@ export function dashboardPage({
   demoRuns = 0,
   liveRuns = 0,
   admin = false,
+  subscription = null,
+  role = 'admin',
 }) {
   const configured = keys.filter((k) => k.present);
   const keyLine = keys.length
@@ -196,6 +208,14 @@ export function dashboardPage({
   const body = `
 <h1>${esc(brand.name ?? '恒野')} · GEO 控制台</h1>
 <div class="sub">${esc([brand.city, brand.scope, brand.industry].filter(Boolean).join(' · ') || '品牌信息待补充')}</div>
+
+${subscription ? `<div class="hint" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;border-color:${subscription.expired ? '#ef4444' : subscription.mode === 'managed' ? '#22d3ee' : '#7c5cff'}">
+  <b>${esc(subscription.planName)}</b>
+  <span class="badge ${subscription.mode === 'managed' ? 'info' : 'mut'}">${esc(subscription.modeName)}</span>
+  <span class="sub">配额 ${esc(subscription.quotaQuestions)} 题/月 · 到期 ${esc(subscription.expireAt ? String(subscription.expireAt).slice(0, 10) : '未设置')}</span>
+  ${subscription.expired ? '<span class="badge bad">已到期，只读</span>' : ''}
+  ${subscription.mode === 'managed' ? '<span class="sub">诊断由服务商代跑，你只需查看结果</span>' : ''}
+</div>` : ''}
 
 ${admin ? `<div class="hint" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
   <b>管理员</b>
@@ -1161,7 +1181,7 @@ button{width:100%;margin-top:18px;background:var(--accent);color:#fff;border:0;b
 /**
  * 客户列表（仅管理员）：一屏看所有客户的最新分数与账号。
  */
-export function clientsPage({ clients = [], generatedAt = '' } = {}) {
+export function clientsPage({ clients = [], plans = [], generatedAt = '' } = {}) {
   const rows = clients
     .map(
       (c) => `<tr>
@@ -1171,6 +1191,10 @@ export function clientsPage({ clients = [], generatedAt = '' } = {}) {
         <td class="mono">${esc(c.runs ?? 0)}</td>
         <td class="mono">${esc(c.lastRunAt ? String(c.lastRunAt).slice(0, 10) : '—')}</td>
         <td class="mono">${esc(c.users ?? 0)}</td>
+        <td><span class="badge ${c.mode === 'managed' ? 'info' : 'mut'}">${esc(c.modeName ?? '—')}</span></td>
+        <td>${esc(c.planName ?? '未开通')}${c.expired ? ' <span class="badge bad">已到期</span>' : ''}</td>
+        <td class="mono">${esc(c.expireAt ? String(c.expireAt).slice(0, 10) : '—')}</td>
+        <td class="mono">${esc(c.quotaQuestions ?? 0)}</td>
         <td><a href="/?brand=${encodeURIComponent(c.slug)}" style="color:#b6a4ff">看板</a></td>
       </tr>`,
     )
@@ -1181,6 +1205,29 @@ export function clientsPage({ clients = [], generatedAt = '' } = {}) {
     body: `
 <h1>客户管理</h1>
 <div class="sub">共 ${esc(clients.length)} 个客户 · 生成于 ${esc(generatedAt)}</div>
+
+<h2>开通 / 续费订阅</h2>
+<div class="card">
+  <form id="subForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <div><label class="sub">客户</label><br>
+      <select name="slug" required style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+        ${clients.map((c) => `<option value="${esc(c.slug)}">${esc(c.name)}（${esc(c.slug)}）</option>`).join('')}
+      </select></div>
+    <div><label class="sub">服务模式</label><br>
+      <select name="mode" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+        <option value="self_service">自助版（客户自己用）</option>
+        <option value="managed">托管版（我们全托管）</option>
+      </select></div>
+    <div><label class="sub">套餐</label><br>
+      <select name="plan" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+        ${plans.map((p) => `<option value="${esc(p.id)}">${esc(p.name)} · ¥${esc(p.priceMonthly)}/月 · ${esc(p.quotaQuestions)} 题</option>`).join('')}
+      </select></div>
+    <div><label class="sub">时长（天）</label><br>
+      <input name="days" type="number" value="30" min="1" max="3650" style="width:110px;background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px"></div>
+    <button type="submit" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer">开通 / 续费</button>
+  </form>
+  <div id="smsg" class="sub" style="margin-top:10px"></div>
+</div>
 
 <h2>新建客户</h2>
 <div class="card">
@@ -1211,7 +1258,7 @@ export function clientsPage({ clients = [], generatedAt = '' } = {}) {
 <h2>全部客户</h2>
 ${
     clients.length
-      ? `<table><thead><tr><th>客户</th><th>最新分</th><th>等级</th><th>运行</th><th>最近运行</th><th>账号</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      ? `<table><thead><tr><th>客户</th><th>最新分</th><th>等级</th><th>运行</th><th>最近运行</th><th>账号</th><th>模式</th><th>套餐</th><th>到期</th><th>配额</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
       : `<div class="card empty">还没有客户</div>`
   }
 
@@ -1226,6 +1273,15 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
   const data = await res.json();
   msg.textContent = res.ok ? '已创建：' + data.client.slug + '（刷新页面可见）' : '失败：' + (data.error || res.status);
   if (res.ok) setTimeout(() => location.reload(), 800);
+});
+document.getElementById('subForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  const msg = document.getElementById('smsg');
+  const res = await fetch('/api/clients/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  const data = await res.json().catch(() => ({}));
+  msg.textContent = res.ok ? ('已开通：' + data.subscription.planName + ' / ' + data.subscription.modeName + '，到期 ' + String(data.subscription.expireAt).slice(0, 10)) : '失败：' + (data.error || res.status);
+  if (res.ok) setTimeout(() => location.reload(), 900);
 });
 document.getElementById('userForm').addEventListener('submit', async (e) => {
   e.preventDefault();
