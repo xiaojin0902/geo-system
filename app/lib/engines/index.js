@@ -17,6 +17,7 @@ import { createDoubaoEngine, DOUBAO_META, doubaoReadiness } from './doubao.js';
 import { createKimiEngine, KIMI_META, kimiReadiness } from './kimi.js';
 import { createYuanbaoEngine, YUANBAO_META, yuanbaoReadiness } from './yuanbao.js';
 import { createCompatEngine } from './compat.js';
+import { createAnthropicEngine } from './anthropic.js';
 import { PROVIDERS, providerOf, providerReadiness } from './providers.js';
 import { pickKey } from './http.js';
 
@@ -24,7 +25,8 @@ import { pickKey } from './http.js';
  * 引擎清单（唯一常量源）。顺序即报告/控制台的稳定展示顺序。
  * 五个中文引擎 + mock，对应 OmniRank 的通义/DeepSeek/豆包/Kimi/元宝。
  */
-const SPECIAL_META = [DEEPSEEK_META, DASHSCOPE_META, DOUBAO_META, KIMI_META, YUANBAO_META];
+const CLAUDE_META = { id: 'claude', label: 'Claude · 联网', requiresKey: true };
+const SPECIAL_META = [DEEPSEEK_META, DASHSCOPE_META, DOUBAO_META, KIMI_META, YUANBAO_META, CLAUDE_META];
 const specialIds = new Set(SPECIAL_META.map((meta) => meta.id));
 
 /** 兼容供应商的展示名：标注是否支持服务端联网（对话模式 ≠ 搜索可见度） */
@@ -55,6 +57,7 @@ const SPECIAL_KEY_NAMES = Object.freeze({
   doubao: 'DOUBAO_API_KEY',
   kimi: 'KIMI_API_KEY',
   yuanbao: 'YUANBAO_API_KEY',
+  claude: 'CLAUDE_API_KEY',
 });
 
 /** 需要额外配置（模型 ID / 端点）的引擎，给 doctor 与控制台用 */
@@ -124,6 +127,15 @@ export function getEngine(id, { env = {}, fetchImpl } = {}) {
       return createKimiEngine({ env, fetchImpl });
     case 'yuanbao':
       return createYuanbaoEngine({ env, fetchImpl });
+    case 'claude': {
+      const key = pickKey(env, 'CLAUDE_API_KEY') || pickKey(env, 'ANTHROPIC_API_KEY');
+      return createAnthropicEngine({
+        meta: CLAUDE_META,
+        apiKey: key,
+        model: pickKey(env, 'CLAUDE_MODEL') || 'claude-sonnet-4-5',
+        fetchImpl,
+      });
+    }
     default: {
       if (providerOf(id)) return createCompatEngine(id, { env, fetchImpl });
     }

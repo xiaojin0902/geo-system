@@ -24,6 +24,27 @@ import {
 import { apiErrorMessage, collectCitations, collectSearchQueries } from './parse.js';
 
 /**
+ * 部分厂商（Perplexity）把引用放在 `citations: ["https://…"]` 这种纯字符串数组里，
+ * 而不是带 url 字段的对象。这个函数把它们补进统一的引用结构。
+ */
+function stringCitations(data) {
+  const out = [];
+  const push = (value) => {
+    if (typeof value === 'string' && /^https?:\/\//iu.test(value.trim())) {
+      const url = value.trim();
+      out.push({ title: url, url });
+    }
+  };
+  if (Array.isArray(data?.citations)) data.citations.forEach(push);
+  if (Array.isArray(data?.search_results)) {
+    for (const item of data.search_results) {
+      if (item && typeof item === 'object' && typeof item.url === 'string') out.push({ title: item.title ?? item.url, url: item.url });
+    }
+  }
+  return out;
+}
+
+/**
  * @param {object} options
  * @param {{id:string,label:string}} options.meta
  * @param {string} options.endpoint 完整 chat/completions URL
@@ -147,7 +168,7 @@ export function createOpenAICompatibleEngine({
           if (looksLikeRefusal(answer)) {
             return {
               text: answer,
-              citations: mergeCitations(collectCitations(data, { limit: 10 }), extractCitations(answer, 10), 10),
+              citations: mergeCitations(collectCitations(data, { limit: 10 }), stringCitations(data), extractCitations(answer, 10), 10),
               searchQueries: collectSearchQueries(data),
               raw: data,
               status: 'refused',
@@ -159,7 +180,7 @@ export function createOpenAICompatibleEngine({
           }
           return buildResult({
             text: answer,
-            citations: collectCitations(data, { limit: 10 }),
+            citations: [...collectCitations(data, { limit: 10 }), ...stringCitations(data)],
             queries: collectSearchQueries(data),
             raw: data,
             usedTools: Boolean(attempt.tools),

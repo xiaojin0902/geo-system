@@ -101,6 +101,7 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
     ['/', '总览'],
     ['/run-diagnose', '跑诊断'],
     ['/cockpit', '语义份额驾驶舱'],
+    ['/responses', '回答浏览器'],
     ['/insights', '可见度分析'],
     ['/tools', '工具箱'],
     ['/distribution', '分发矩阵'],
@@ -781,6 +782,7 @@ export function cockpitPage({
   previous = null,
   trend = [],
   engines = [],
+  plan = null,
 } = {}) {
   const pct = (v) => `${((Number(v) || 0) * 100).toFixed(1)}%`;
   const num = (v, d = 1) => (Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '—');
@@ -916,6 +918,26 @@ ${threatList}
 
 <h2>判定分布（10 态）</h2>
 ${verdictBars}
+
+<h2>30 / 60 / 90 天路线图</h2>
+${
+    (plan?.phases ?? []).length
+      ? `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:14px">
+        ${plan.phases
+          .map(
+            (phase) => `<div class="card">
+            <div class="k">${esc(phase.window)}</div>
+            <div class="v" style="font-size:17px">${esc(phase.focus)}</div>
+            <div class="sub" style="margin:8px 0 6px">目标</div>
+            <ul style="margin:0;padding-left:18px;line-height:1.8;font-size:12.5px">${(phase.goals ?? []).map((g) => `<li>${esc(g)}</li>`).join('')}</ul>
+            ${(phase.actions ?? []).length ? `<div class="sub" style="margin:10px 0 4px">配套动作</div><ol style="margin:0;padding-left:18px;line-height:1.8;font-size:12.5px">${phase.actions.map((a) => `<li>${esc(a.action)}</li>`).join('')}</ol>` : ''}
+            <div class="sub" style="margin-top:10px;color:#4ade80">验收：${esc(phase.success ?? '')}</div>
+          </div>`,
+          )
+          .join('')}
+      </div>`
+      : `<div class="card empty">样本不足，暂不生成路线图</div>`
+  }
 
 <div class="sub" style="margin-top:26px">曝光质量：篇幅占比 ${pct(exposure.avgWordShare)} · 位置权重 ${num(exposure.avgPositionWeight, 3)} · 首句命中率 ${pct(exposure.firstSentenceRate)}
 ｜ fan-out ${esc(fanout?.unique ?? 0)} 条改写词</div>
@@ -1277,6 +1299,66 @@ ${
       ? `<table style="margin-top:16px"><thead><tr><th>时间</th><th>操作者</th><th>客户</th><th>动作</th><th>详情</th></tr></thead><tbody>${rows}</tbody></table>`
       : `<div class="card empty" style="margin-top:16px">还没有审计记录</div>`
   }`,
+  });
+}
+
+/**
+ * 回答浏览器：逐条看 AI 到底怎么回答的（对标 elmo / aperture 的 Responses 视图）。
+ * 客户最常问「AI 原话是什么、引用的是哪条链接」——这个页面就是给它的。
+ */
+export function responsesPage({ brand = {}, runs = [], runId = null, rows = [], engine = '', verdict = '' } = {}) {
+  const verdictLabels = {
+    recommended: ['推荐', 'ok'], conditionally_recommended: ['条件推荐', 'ok'], candidate: ['候选', 'info'],
+    listed: ['列入', 'info'], mentioned: ['仅提及', 'mut'], not_mentioned: ['未提及', 'bad'],
+    ambiguous: ['歧义', 'warn'], unknown: ['未知', 'mut'], refused: ['拒答', 'warn'], engine_error: ['引擎错误', 'bad'],
+  };
+  const engines = [...new Set(rows.map((r) => r.engine))].sort();
+  const runOptions = runs
+    .map((r) => `<option value="${esc(r.runId)}"${String(r.runId) === String(runId) ? ' selected' : ''}>#${esc(r.runId)} · ${esc(r.kind)}</option>`)
+    .join('');
+  const engineOptions = ['', ...engines]
+    .map((e) => `<option value="${esc(e)}"${e === engine ? ' selected' : ''}>${esc(e || '全部引擎')}</option>`)
+    .join('');
+  const verdictOptions = ['', ...Object.keys(verdictLabels)]
+    .map((v) => `<option value="${esc(v)}"${v === verdict ? ' selected' : ''}>${esc(v ? verdictLabels[v][0] : '全部判定')}</option>`)
+    .join('');
+
+  const items = rows
+    .map((row) => {
+      const [label, cls] = verdictLabels[row.verdict] ?? [row.verdict, 'mut'];
+      const citations = Array.isArray(row.citations) ? row.citations : [];
+      return `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <div><b>${esc(row.question)}</b></div>
+          <div><span class="badge mut">${esc(row.engine)}</span> <span class="badge ${cls}">${esc(label)}</span>
+          <span class="sub" style="margin-left:8px">${esc(citations.length)} 条引用 · ${esc(row.latencyMs ?? 0)}ms</span></div>
+        </div>
+        <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">看 AI 原话</summary>
+          <pre class="mono" style="white-space:pre-wrap;line-height:1.75;margin:8px 0 0;font-size:12.5px">${esc(row.text || '（空回答）')}</pre>
+        </details>
+        ${row.matchedText ? `<div class="sub" style="margin-top:6px">命中片段：<span class="mono">${esc(row.matchedText)}</span></div>` : ''}
+        ${citations.length ? `<div class="sub" style="margin-top:6px">引用：${citations.slice(0, 5).map((c) => `<span class="mono">${esc(String(c.url ?? c).replace(/^https?:\/\//, '').slice(0, 40))}</span>`).join(' · ')}</div>` : ''}
+      </div>`;
+    })
+    .join('');
+
+  return layout({
+    title: '回答浏览器',
+    active: '/responses',
+    body: `
+<h1>回答浏览器</h1>
+<div class="sub">逐条查看 AI 的原话、判定与引用来源 · 第 ${esc(rows.length)} 条 · ${esc([brand.city, brand.industry].filter(Boolean).join(' · '))}</div>
+
+<form method="get" action="/responses" class="card" style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+  <select name="run" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px">${runOptions}</select>
+  <select name="engine" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px">${engineOptions}</select>
+  <select name="verdict" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px">${verdictOptions}</select>
+  <button type="submit" style="background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer">筛选</button>
+  <a href="/responses" class="sub">重置</a>
+</form>
+
+${items || '<div class="card empty">这一轮没有可展示的回答（或筛选后为空）</div>'}
+`,
   });
 }
 

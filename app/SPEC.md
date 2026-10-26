@@ -447,6 +447,14 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 - 周报：`lib/weekly.js`（buildWeeklyReport/renderWeeklyMarkdown/renderWeeklyHtml）+ `geo weekly` + `/weekly`；
   支持 `--push <webhook>`（企微/钉钉/邮件网关）。
 
+## 3.33 对标 GitHub 开源 GEO 平台的补充（2026-10-26 追加）
+
+参考 `yaojingang/GEORank`、`elmohq/elmo`、`anyin-ai/aperture` 的能力清单，补了四项：
+1. 引擎扩到 **13 家**：新增 Perplexity（自带联网与 citations）与 Claude（Messages API + web_search）；
+2. `/responses` 回答浏览器：逐条看 AI 原话、判定、命中片段与引用，可按引擎/判定筛选；
+3. `buildPhases`：30/60/90 天路线图（认得你 → 引用你 → 份额与防守），渲染在驾驶舱；
+4. `/api/providers`：引擎与就绪状态由后端返回，前端不漂移。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

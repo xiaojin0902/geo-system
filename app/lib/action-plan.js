@@ -548,6 +548,7 @@ export function buildActionPlan({ brand, score, insights, rows, competitors } = 
     return {
       top10: [],
       days30: [],
+      phases: [],
       risks: [],
       generatedFrom: { total: 0, coverage: 0, mentionedRate: 0, competitorCount: 0 },
     };
@@ -581,6 +582,7 @@ export function buildActionPlan({ brand, score, insights, rows, competitors } = 
   return {
     top10,
     days30: buildDays30(ctx),
+    phases: buildPhases({ top10, insights: ctx.insights, coverage: ctx.coverage, check: ctx.check }),
     risks: buildRisks(ctx),
     generatedFrom: {
       total: ctx.sample.total,
@@ -589,6 +591,57 @@ export function buildActionPlan({ brand, score, insights, rows, competitors } = 
       competitorCount: ctx.competitorCount,
     },
   };
+}
+
+/**
+ * 30/60/90 天分阶段方案（对标 GEOrank 的 30/60/90 天行动方案）。
+ *
+ * 分法不是拍脑袋：AI 可见度的提升有先后依赖——
+ *   0-30 天先让 AI「认得你」（实体信息、可抓取资产、第一批信源）；
+ *   31-60 天再让 AI「引用你」（结构化页面、问答覆盖、引用位）；
+ *   61-90 天做「份额与防守」（竞品对比、长尾覆盖、同名实体压制、月度复盘）。
+ *
+ * @param {{top10?:Array, insights?:object, coverage?:object, check?:object}} input
+ */
+export function buildPhases({ top10 = [], insights = null, coverage = null, check = null } = {}) {
+  const actions = Array.isArray(top10) ? top10 : [];
+  const ownShare = Number(insights?.citations?.ownShare ?? 0);
+  const coverageRatio = Number(coverage?.ratio ?? 0);
+  return [
+    {
+      window: '0–30 天',
+      focus: '让 AI 认得你',
+      goals: [
+        '实体可核实：全称 + 城市 + 业务词统一出现在官网、工商、社媒',
+        coverageRatio >= 0.5 ? '采集覆盖率达标，继续维持' : '把采集覆盖率提到 50% 以上（没测成 ≠ 0 分）',
+        '官网具备可抓取资产：llms.txt、Organization/FAQ JSON-LD、sitemap',
+      ],
+      actions: actions.slice(0, 3).map((item) => ({ rank: item.rank, action: item.action, owner: item.owner, deadline: item.deadline })),
+      success: ownShare > 0 ? '自有站点引用占比 > 0' : '出现第一条自有站点引用',
+    },
+    {
+      window: '31–60 天',
+      focus: '让 AI 引用你',
+      goals: [
+        '每个高价值问题都有对应可被抓取的问答页',
+        '知乎/公众号各形成 3–5 篇可被引用的信源',
+        '品牌提及率较基线提升 10pt 以上',
+      ],
+      actions: actions.slice(3, 6).map((item) => ({ rank: item.rank, action: item.action, owner: item.owner, deadline: item.deadline })),
+      success: '品牌提及率较首月基线 +10pt',
+    },
+    {
+      window: '61–90 天',
+      focus: '做份额与防守',
+      goals: [
+        '竞品对比/选型类内容上线，抢回被竞品占住的引用位',
+        '同名实体压制：全称与官网链接在工商/企查类平台一致',
+        '每月复盘一次，把有效动作固化成 SOP',
+      ],
+      actions: actions.slice(6, 10).map((item) => ({ rank: item.rank, action: item.action, owner: item.owner, deadline: item.deadline })),
+      success: '语义份额（SoV）稳定超过首月基线',
+    },
+  ];
 }
 
 /** rank → 优先级标签：前三名 P0，中间 P1，最后 P2（只用于展示，不写进 JSON 契约） */

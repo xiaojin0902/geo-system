@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { APP_ROOT, DATA_DIR, brandPath, dbPath } from './config.js';
-import { engineHasKey, listEngines } from './engines/index.js';
+import { engineHasKey, engineReadiness, getEngine, listEngines } from './engines/index.js';
 import { openStore } from './store.js';
 import { runDoctor } from './doctor.js';
 import {
@@ -45,6 +45,7 @@ import {
   insightsPage,
   layout,
   loginPage,
+  responsesPage,
   setTheme,
   clientsPage,
   settingsPage,
@@ -697,6 +698,70 @@ async function handle(req, res, slug, auth = null) {
     return html(res, 200, distributionPage({ brand: state.brand, channels, contents, publications }));
   }
 
+  // ---------------------------------------------------------- 回答浏览器
+  if (req.method === 'GET' && pathname === '/responses') {
+    const state = collectState(slug);
+    const requested = Number(url.searchParams.get('run'));
+    const fallback = state.runs.find((run) => run.total !== null) ?? state.runs[0] ?? null;
+    const runId = Number.isFinite(requested) && requested > 0 ? requested : (fallback ? fallback.runId : null);
+    const engine = String(url.searchParams.get('engine') ?? '');
+    const verdict = String(url.searchParams.get('verdict') ?? '');
+    let rows = [];
+    if (runId && fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const detail = store.getRunDetail(runId);
+        rows = (detail?.rows ?? []).map((row) => ({
+          question: row.question?.text ?? '',
+          engine: row.answer?.engine ?? '—',
+          verdict: row.judgment?.verdict ?? 'unknown',
+          text: row.answer?.text ?? '',
+          citations: row.answer?.citations ?? [],
+          matchedText: row.judgment?.matchedText ?? '',
+          latencyMs: row.answer?.latencyMs ?? 0,
+        }));
+      } catch {
+        rows = [];
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    if (engine) rows = rows.filter((row) => row.engine === engine);
+    if (verdict) rows = rows.filter((row) => row.verdict === verdict);
+    return html(res, 200, responsesPage({ brand: state.brand, runs: state.runs, runId, rows, engine, verdict }));
+  }
+
+  // ---------------------------------------------------------- 引擎与供应商信息（前端不漂移）
+  if (req.method === 'GET' && pathname === '/api/providers') {
+    const list = listEngines().map((meta) => {
+      const readiness = meta.requiresKey ? engineReadiness(meta.id, process.env) : { ready: true, reason: '' };
+      let described = {};
+      try {
+        const engine = getEngine(meta.id, { env: process.env });
+        described = typeof engine.describe === 'function' ? engine.describe() : {};
+      } catch {
+        described = {};
+      }
+      return {
+        id: meta.id,
+        label: meta.label,
+        configured: readiness.ready,
+        reason: readiness.reason,
+        endpoint: described.endpoint ?? null,
+        model: described.model ?? null,
+        builtinSearch: Boolean(described.builtinSearch),
+      };
+    });
+    return json(res, 200, { ok: true, count: list.length, engines: list });
+  }
+
   // ---------------------------------------------------------- 客户周报
   if (req.method === 'GET' && pathname === '/weekly') {
     let report = null;
@@ -998,13 +1063,28 @@ async function handle(req, res, slug, auth = null) {
     const runId = Number.isFinite(requested) && requested > 0 ? requested : (fallback ? fallback.runId : null);
     let insights = null;
     let previous = null;
+    let plan = null;
     const trend = [];
     if (runId && fs.existsSync(dbPath())) {
       let store = null;
       try {
         store = openStore(dbPath());
         const detail = store.getRunDetail(runId);
-        if (detail) insights = analyzeRun({ brand: detail.brand, rows: detail.rows });
+        if (detail) {
+          insights = analyzeRun({ brand: detail.brand, rows: detail.rows });
+          try {
+            const planMod = await import('./action-plan.js');
+            plan = planMod.buildActionPlan({
+              brand: detail.brand,
+              score: store.getScore(runId),
+              insights,
+              rows: detail.rows,
+              competitors: insights.sov?.competitors ?? [],
+            });
+          } catch {
+            plan = null;
+          }
+        }
 
         // 上一轮（用于 delta 对比）
         const ordered = state.runs.filter((run) => run.runId < runId);
@@ -1049,6 +1129,7 @@ async function handle(req, res, slug, auth = null) {
         insights,
         previous,
         trend,
+        plan,
         engines: engineStatus(),
       }),
     );

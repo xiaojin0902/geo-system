@@ -24,6 +24,7 @@ cd hengye-geo
 | **闭环验收** | 一键跑完 10 步（建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测），看哪一步断了 |
 | **分发矩阵** | 11 个渠道 × 全部内容的覆盖矩阵（对标摘星AI 内容矩阵分发） |
 | **工具箱** | 报价 / 自动出题 / 发布渠道状态，不敲命令也能用 |
+| **回答浏览器** | 逐条看 AI 原话/判定/引用，支持按引擎与判定筛选 |
 | **语义份额驾驶舱** | SoV/提及率/自有引用占比/情感 + 近 8 轮趋势 + 多引擎矩阵 + 竞品份额 + 10 态分布 |
 | **可见度分析** | 引用源 / 竞品 SoV / 曝光质量 / 情感倾向（与报告第五章同源） |
 | **问题库** | 看 99 条「用户会问 AI 的问题」 |
@@ -59,7 +60,7 @@ node bin/geo.js diagnose --brand hengye --engines live --limit 30
 - 没有 Key 时命令会明确报错并提示改用 mock，不会静默失败
 - 填完 Key 先跑 `node bin/geo.js doctor --probe`：它会真调一次 API，告诉你通没通、走的哪条检索路径
 
-**引擎覆盖（11 家，对标摘星AI 的「11 大模型」）**：
+**引擎覆盖（13 家，含 Perplexity / Claude 这类 AI 搜索主力）**：
 
 | 引擎 | 需要配置 | 联网方式 |
 |---|---|---|
@@ -71,6 +72,8 @@ node bin/geo.js diagnose --brand hengye --engines live --limit 30
 | 文心一言 | `QIANFAN_API_KEY` | 千帆 v2，`web_search` 工具 |
 | 智谱 GLM | `ZHIPU_API_KEY` | `web_search` 工具 |
 | 腾讯混元 | `HUNYUAN_API_KEY` | OpenAI 兼容 |
+| Perplexity | `PERPLEXITY_API_KEY` | 自带联网与 citations |
+| Claude | `CLAUDE_API_KEY` | Messages API + web_search 工具 |
 | MiniMax | `MINIMAX_API_KEY` | OpenAI 兼容 |
 | Gemini | `GEMINI_API_KEY` | OpenAI 兼容端点 |
 | ChatGPT | `OPENAI_API_KEY` | OpenAI 兼容（对话模式） |
