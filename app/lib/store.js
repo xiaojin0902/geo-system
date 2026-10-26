@@ -160,6 +160,16 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 
+-- 代理：服务商授权的分销商，有自己的客户池与进货配额
+CREATE TABLE IF NOT EXISTS agents (
+  username TEXT PRIMARY KEY,
+  name TEXT,
+  quota_total INTEGER NOT NULL DEFAULT 0,
+  commission_rate REAL NOT NULL DEFAULT 0.3,
+  created_at TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
 -- 白标与配额等设置：brand_id 为 NULL 表示全局
 CREATE TABLE IF NOT EXISTS settings (
   brand_id INTEGER,
@@ -260,6 +270,7 @@ function mapBrand(row) {
     city: row.city,
     scope: row.scope,
     industry: row.industry,
+    agent: row.agent ?? null,
     services: parseJson(row.services_json, []),
     targetCustomers: parseJson(row.target_customers_json, []),
     priceRange: row.price_range,
@@ -385,6 +396,7 @@ export class Store {
     addColumn('answers', 'search_queries_json', 'search_queries_json TEXT');
     addColumn('brands', 'disambiguation_json', 'disambiguation_json TEXT');
     addColumn('brands', 'same_name_hints_json', 'same_name_hints_json TEXT');
+    addColumn('brands', 'agent', 'agent TEXT');
   }
 
   close() {
@@ -485,6 +497,8 @@ export class Store {
       ts,
     );
     const row = this.#stmt('SELECT id FROM brands WHERE slug = ?').get(slug);
+    // agent 列不参与 upsert 的 22 字段（改动面太大），这里单独补写
+    if (brand.agent !== undefined) this.setBrandAgent(Number(row.id), brand.agent);
     return Number(row.id);
   }
 
@@ -863,6 +877,60 @@ export class Store {
   }
 
 
+  // ----------------------------------------------------------- agents（代理）
+
+  createAgent({ username, name = '', quotaTotal = 0, commissionRate = 0.3 } = {}) {
+    const key = String(username ?? '').trim();
+    if (!/^[a-zA-Z0-9_.-]{2,40}$/u.test(key)) throw new Error('代理用户名 2-40 位字母/数字/._-');
+    try {
+      this.#stmt('INSERT INTO agents (username, name, quota_total, commission_rate, created_at, active) VALUES (?,?,?,?,?,1)').run(
+        key,
+        String(name || key),
+        Math.max(0, Number(quotaTotal) || 0),
+        Math.min(0.9, Math.max(0, Number(commissionRate) || 0.3)),
+        nowIso(),
+      );
+    } catch (error) {
+      if (String(error?.message ?? '').includes('UNIQUE')) throw new Error(`代理「${key}」已存在`);
+      throw error;
+    }
+    return this.getAgent(key);
+  }
+
+  getAgent(username) {
+    const row = this.#stmt('SELECT * FROM agents WHERE username = ?').get(String(username ?? ''));
+    if (!row) return null;
+    return {
+      username: row.username,
+      name: row.name,
+      quotaTotal: Number(row.quota_total),
+      commissionRate: Number(row.commission_rate),
+      createdAt: row.created_at,
+      active: Number(row.active) === 1,
+    };
+  }
+
+  listAgents() {
+    return this.#stmt('SELECT * FROM agents ORDER BY username').all().map((row) => ({
+      username: row.username,
+      name: row.name,
+      quotaTotal: Number(row.quota_total),
+      commissionRate: Number(row.commission_rate),
+      createdAt: row.created_at,
+      active: Number(row.active) === 1,
+    }));
+  }
+
+  /** 把客户绑定到代理（agent 传 null 表示直营） */
+  setBrandAgent(brandId, agent) {
+    return this.#stmt('UPDATE brands SET agent = ? WHERE id = ?').run(agent ? String(agent) : null, Number(brandId)).changes > 0;
+  }
+
+  /** 列某代理名下的客户 */
+  listBrandsByAgent(agent) {
+    return this.#stmt('SELECT * FROM brands WHERE agent = ? ORDER BY id').all(String(agent)).map(mapBrand);
+  }
+
   // ----------------------------------------------------------- users / sessions
 
   createUser({ username, passHash, role = 'client', brandSlug = null } = {}) {
@@ -871,7 +939,7 @@ export class Store {
     try {
       this.#stmt(
         'INSERT INTO users (username, pass_hash, role, brand_slug, created_at, active) VALUES (?,?,?,?,?,1)',
-      ).run(name, String(passHash ?? ''), role === 'admin' ? 'admin' : 'client', brandSlug, nowIso());
+      ).run(name, String(passHash ?? ''), ['admin', 'agent', 'client'].includes(role) ? role : 'client', brandSlug, nowIso());
     } catch (error) {
       if (String(error?.message ?? '').includes('UNIQUE')) throw new Error(`用户名「${name}」已存在`);
       throw error;
@@ -904,6 +972,12 @@ export class Store {
     }));
   }
 
+  /** 修正角色（历史账号/误建时用） */
+  setUserRole(username, role) {
+    const value = ['admin', 'agent', 'client'].includes(role) ? role : 'client';
+    return this.#stmt('UPDATE users SET role = ? WHERE username = ?').run(value, String(username ?? '')).changes > 0;
+  }
+
   setUserActive(username, active) {
     return this.#stmt('UPDATE users SET active = ? WHERE username = ?').run(active ? 1 : 0, String(username ?? '')).changes > 0;
   }
@@ -915,7 +989,7 @@ export class Store {
     this.#stmt('INSERT INTO sessions (token, username, role, created_at, expires_at) VALUES (?,?,?,?,?)').run(
       String(token),
       String(username),
-      role === 'admin' ? 'admin' : 'client',
+      ['admin', 'agent', 'client'].includes(role) ? role : 'client',
       nowIso(),
       expires,
     );

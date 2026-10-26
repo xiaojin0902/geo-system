@@ -463,6 +463,13 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 门禁：客户角色下——到期未续费 → 只读（动作接口 402）；托管版 → 执行接口 403 且导航隐藏动作页；
 配额只约束客户，服务商管理员不受限。
 
+## 3.35 代理层（2026-10-26 追加）
+
+`agents` 表（username/name/quota_total/commission_rate/active）+ `brands.agent` 列（迁移自动加）。
+角色 `agent`：登录后进 `/agent` 总览（名下客户、进货配额、本月用量、客户营收与分成估算）；
+`/clients` 仅返回自己客户，新建客户自动绑定自己；订阅接口只允许给自己客户开通；`/settings` `/audit-log` 一律 403。
+CLI：`geo agent --add/--list/--report`、`geo client ... --agent <代理>`。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

@@ -46,6 +46,7 @@ import {
   insightsPage,
   layout,
   loginPage,
+  agentPage,
   responsesPage,
   setNavPolicy,
   setTheme,
@@ -316,7 +317,7 @@ function checkAuth(req, auth) {
 async function handle(req, res, slug, auth = null) {
   const url = new URL(req.url, `http://${req.headers.host ?? '127.0.0.1'}`);
   const pathname = decodeURIComponent(url.pathname);
-  setNavPolicy({ canAct: true });
+  setNavPolicy({ canAct: true, role: 'admin' });
 
   // ---------------------------------------------------------------- 登录与会话
   // 公开路径：健康检查、客户分享链接、登录页、静态图标
@@ -377,7 +378,7 @@ async function handle(req, res, slug, auth = null) {
         return json(res, 403, { ok: false, error: '当前为托管服务：诊断由服务商代跑，你无需操作' });
       }
       // 客户不能执行动作时，导航里隐藏动作类页面
-      setNavPolicy({ canAct: subscription.clientCanAct });
+      setNavPolicy({ canAct: subscription.clientCanAct, role: 'client' });
     }
   }
 
@@ -407,6 +408,102 @@ async function handle(req, res, slug, auth = null) {
         }
       }
     }
+  }
+
+  // 代理（agent）：服务商 → 代理 → 客户 三层中的中间层
+  // 代理只能看自己名下的客户，且能替客户开通/续费
+  let agentContext = null;
+  if (actor?.role === 'agent') {
+    let store = null;
+    let brands = [];
+    try {
+      store = openStore(dbPath());
+      const agentRow = store.getAgent(actor.username);
+      brands = store.listBrandsByAgent(actor.username);
+      agentContext = { agent: actor.username, agentRow, brands };
+    } catch {
+      brands = [];
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    setNavPolicy({ canAct: true, role: 'agent' });
+    const allowed = ['/agent', '/clients', '/logout', '/login'];
+    const requested = String(url.searchParams.get('brand') ?? '').trim();
+    const target = brands.find((b) => b.slug === requested) ?? brands[0] ?? null;
+    if (!target) {
+      if (!allowed.includes(pathname) && !pathname.startsWith('/reports/')) {
+        res.writeHead(302, { location: '/agent' });
+        res.end();
+        return;
+      }
+      slug = '';
+    } else {
+      slug = target.slug;
+    }
+    if (pathname === '/settings' || pathname === '/audit-log' || pathname === '/api/settings' || pathname === '/api/clients/subscription') {
+      // 订阅接口对代理开放（仅自己客户），其余管理页不开
+      if (pathname !== '/api/clients/subscription') {
+        return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1><div class="sub">该页面仅服务商可用。</div>' }));
+      }
+    }
+  }
+
+  // 代理总览页
+  if (req.method === 'GET' && pathname === '/agent' && agentContext) {
+    let rows = agentContext.brands.map((brand) => {
+      const sub = resolveSubscription({});
+      return { brand, sub };
+    });
+    // 逐客户读订阅与本月用量
+    let store = null;
+    try {
+      store = openStore(dbPath());
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      rows = agentContext.brands.map((brand) => {
+        const sub = resolveSubscription(store.listSettings(brand.id));
+        const used = store
+          .listRuns(brand.id, 500)
+          .filter((run) => run.startedAt && new Date(run.startedAt).getTime() >= monthStart.getTime())
+          .reduce((sum, run) => sum + Number(run.okN ?? 0), 0);
+        return { brand, sub, used };
+      });
+    } catch {
+      rows = [];
+    } finally {
+      if (store) {
+        try {
+          store.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    const totalUsed = rows.reduce((sum, row) => sum + row.used, 0);
+    const totalRevenue = rows.reduce((sum, row) => sum + (row.sub.priceMonthly ?? 0), 0);
+    const quota = agentContext.agentRow?.quotaTotal ?? 0;
+    const commission = agentContext.agentRow?.commissionRate ?? 0;
+    return html(
+      res,
+      200,
+      agentPage({
+        agent: agentContext.agent,
+        agentName: agentContext.agentRow?.name ?? agentContext.agent,
+        quota,
+        used: totalUsed,
+        commissionRate: commission,
+        totalRevenue,
+        clients: rows,
+        generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      }),
+    );
   }
 
   // 登录 / 登出
@@ -871,14 +968,18 @@ async function handle(req, res, slug, auth = null) {
 
   // ---------------------------------------------------------- 多客户管理（管理员）
   if (req.method === 'GET' && pathname === '/clients') {
-    if (actor?.role !== 'admin') return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1>' }));
+    if (actor?.role !== 'admin' && actor?.role !== 'agent') {
+      return html(res, 403, layout({ title: '无权访问', body: '<h1>无权访问</h1><div class="sub">该页面仅服务商与代理可用。</div>' }));
+    }
     let clients = [];
     if (fs.existsSync(dbPath())) {
       let store = null;
       try {
         store = openStore(dbPath());
         const users = store.listUsers();
-        clients = store.listBrands().map((brand) => {
+        const isAgent = actor?.role === 'agent';
+        const brandRows = isAgent ? store.listBrandsByAgent(actor.username) : store.listBrands();
+        clients = brandRows.map((brand) => {
           const sub = resolveSubscription(store.listSettings(brand.id));
           const runs = store.listRuns(brand.id, 5);
           const scored = runs.find((run) => run.total !== null) ?? runs[0] ?? null;
@@ -961,9 +1062,9 @@ async function handle(req, res, slug, auth = null) {
     return html(res, 200, auditLogPage({ entries, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
   }
 
-  // 新建客户（管理员）
+  // 新建客户（管理员或代理）
   if (req.method === 'POST' && pathname === '/api/clients') {
-    if (actor?.role !== 'admin') return json(res, 403, { ok: false, error: '无权操作' });
+    if (actor?.role !== 'admin' && actor?.role !== 'agent') return json(res, 403, { ok: false, error: '无权操作' });
     let store = null;
     try {
       const body = await readBody(req);
@@ -976,6 +1077,7 @@ async function handle(req, res, slug, auth = null) {
       store.upsertBrand({
         slug,
         name,
+        agent: actor?.role === 'agent' ? actor.username : undefined,
         legalName: name,
         city: String(body.city ?? '').trim(),
         industry: '内容代运营',
@@ -1002,7 +1104,7 @@ async function handle(req, res, slug, auth = null) {
 
   // 开通/修改订阅（管理员）
   if (req.method === 'POST' && pathname === '/api/clients/subscription') {
-    if (actor?.role !== 'admin') return json(res, 403, { ok: false, error: '无权操作' });
+    if (actor?.role !== 'admin' && actor?.role !== 'agent') return json(res, 403, { ok: false, error: '无权操作' });
     let store = null;
     try {
       const body = await readBody(req);
@@ -1016,6 +1118,9 @@ async function handle(req, res, slug, auth = null) {
       store = openStore(dbPath());
       const brand = store.getBrand(slug);
       if (!brand) return json(res, 404, { ok: false, error: `客户「${slug}」不存在` });
+      if (actor?.role === 'agent' && brand.agent !== actor.username) {
+        return json(res, 403, { ok: false, error: '只能给自己名下的客户开通订阅' });
+      }
       const expireAt = new Date(Date.now() + days * 86400000).toISOString();
       store.setSetting('service_mode', mode, brand.id);
       store.setSetting('plan', plan.id, brand.id);

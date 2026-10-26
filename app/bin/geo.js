@@ -39,6 +39,7 @@ const HELP = `
   share      客户分享链接：生成只读报告链接（可设到期，可吊销）
   weekly     生成客户周报（对比上一轮），可推送到 webhook
   client     开通/续费客户订阅（自助版 / 托管版）
+  agent      代理管理：开通代理、分配客户、查看分成
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -71,8 +72,10 @@ const HELP = `
   node bin/geo.js share --run <id> [--days 30] [--base https://你的域名] [--json]
   node bin/geo.js share --list | --revoke <token>
   node bin/geo.js weekly --brand hengye [--push <webhook>] [--json]
-  node bin/geo.js client --slug <客户> --mode managed --plan pro --days 30
+  node bin/geo.js client --slug <客户> --mode managed --plan pro --days 30 [--agent 代理]
   node bin/geo.js client --list
+  node bin/geo.js agent --add --username 代理 --password 密码 --name 名称 --quota 5000
+  node bin/geo.js agent --list | --report --username 代理
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -2625,6 +2628,14 @@ async function cmdClient(flags) {
     if (!plan) throw new CliError(`未知套餐「${planId}」`, [`可用：${plansMod.PLANS.map((p) => `${p.id}（${p.name} ¥${p.priceMonthly}/月）`).join('、')}`]);
     if (!['self_service', 'managed'].includes(mode)) throw new CliError(`模式只能是 self_service 或 managed，收到「${mode}」`);
 
+    const agentName = stringFlag(flags.agent, 'agent') ?? null;
+    if (agentName !== null) {
+      if (agentName && !store.getAgent(agentName)) {
+        throw new CliError(`代理「${agentName}」不存在`, ['先开通代理：node bin/geo.js agent --add --username ...']);
+      }
+      store.setBrandAgent(brand.id, agentName || null);
+      store.writeAudit({ actor: 'cli', brandSlug: slug, action: 'client_assign_agent', detail: agentName || '直营' });
+    }
     const expireAt = new Date(Date.now() + Math.max(1, days) * 86400000).toISOString();
     store.setSetting('service_mode', mode, brand.id);
     store.setSetting('plan', plan.id, brand.id);
@@ -2642,6 +2653,97 @@ async function cmdClient(flags) {
     console.log(`  模式：${sub.modeName}（${sub.clientCanAct ? '客户可自己跑诊断' : '客户只读，服务商代跑'}）`);
     console.log(`  套餐：${sub.planName} · ¥${sub.priceMonthly}/月 · 配额 ${sub.quotaQuestions} 题/月`);
     console.log(`  到期：${sub.expireAt?.slice(0, 10)}`);
+    return 0;
+  });
+}
+
+
+/** 代理管理：开通/列出/查看分成（服务商 → 代理 → 客户 三层）。 */
+async function cmdAgent(flags) {
+  const plansMod = await import('../lib/plans.js');
+  return withStore(async (store) => {
+    if (flags.add) {
+      const username = stringFlag(flags.username, 'username');
+      const password = stringFlag(flags.password, 'password');
+      if (!username) throw new CliError('缺少 --username', ['用法：node bin/geo.js agent --add --username 代理 --password 密码 --quota 5000']);
+      if (!password || password.length < 8) throw new CliError('--password 至少 8 位');
+      const quota = intFlag(flags.quota, 'quota', 5000);
+      const commission = Number(stringFlag(flags.commission, 'commission') ?? '0.3');
+      const agent = store.createAgent({ username, name: stringFlag(flags.name, 'name') ?? username, quotaTotal: quota, commissionRate: commission });
+      const { hashPassword } = await import('../lib/auth.js');
+      store.createUser({ username, passHash: hashPassword(password), role: 'agent', brandSlug: null });
+      store.writeAudit({ actor: 'cli', action: 'agent_create', detail: `${username} quota=${quota} commission=${commission}` });
+      console.log('✔ 代理已开通');
+      console.log(`  账号：${agent.username} · 名称：${agent.name}`);
+      console.log(`  进货配额：${agent.quotaTotal} 题 · 分成：${(agent.commissionRate * 100).toFixed(0)}%`);
+      console.log(`  登录后只能看到自己的客户；新增客户请用 /clients`);
+      return 0;
+    }
+
+    if (flags.report) {
+      const username = stringFlag(flags.report, 'report') ?? stringFlag(flags.username, 'username');
+      if (!username) throw new CliError('缺少 --report <代理用户名>');
+      const agent = store.getAgent(username);
+      if (!agent) throw new CliError(`代理「${username}」不存在`, ['先开通：node bin/geo.js agent --add --username ...']);
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const rows = store.listBrandsByAgent(username).map((brand) => {
+        const sub = plansMod.resolveSubscription(store.listSettings(brand.id));
+        const used = store
+          .listRuns(brand.id, 500)
+          .filter((run) => run.startedAt && new Date(run.startedAt).getTime() >= monthStart.getTime())
+          .reduce((sum, run) => sum + Number(run.okN ?? 0), 0);
+        return { brand, sub, used };
+      });
+      const totalRevenue = rows.reduce((sum, r) => sum + r.sub.priceMonthly, 0);
+      const totalUsed = rows.reduce((sum, r) => sum + r.used, 0);
+      const payload = {
+        agent: agent.username,
+        name: agent.name,
+        quota: agent.quotaTotal,
+        used: totalUsed,
+        clients: rows.map((r) => ({ slug: r.brand.slug, name: r.brand.name, plan: r.sub.planName, mode: r.sub.modeName, used: r.used, quota: r.sub.quotaQuestions, expired: r.sub.expired })),
+        revenue: totalRevenue,
+        commissionRate: agent.commissionRate,
+        commission: Math.round(totalRevenue * agent.commissionRate),
+      };
+      if (flags.json) {
+        console.log(JSON.stringify(payload, null, 2));
+        return 0;
+      }
+      console.log(`代理：${payload.name}（${payload.agent}）`);
+      console.log(`客户 ${rows.length} 个 · 本月用题 ${totalUsed}/${agent.quotaTotal} · 客户营收 ¥${totalRevenue} · 分成 ¥${payload.commission}`);
+      if (rows.length) {
+        printTable(
+          ['客户', '模式', '套餐', '本月用量', '状态'],
+          rows.map((r) => [r.brand.slug, r.sub.modeName, r.sub.planName, `${r.used}/${r.sub.quotaQuestions}`, r.sub.expired ? '已到期' : r.sub.active ? '有效' : '未开通']),
+        );
+      }
+      return 0;
+    }
+
+    // 默认：列表
+    const agents = store.listAgents();
+    if (flags.json) {
+      console.log(JSON.stringify(agents, null, 2));
+      return 0;
+    }
+    if (!agents.length) {
+      console.log('还没有代理。用：node bin/geo.js agent --add --username 代理 --password 密码 --quota 5000');
+      return 0;
+    }
+    printTable(
+      ['代理', '名称', '配额', '分成', '客户数', '创建'],
+      agents.map((agent) => [
+        agent.username,
+        agent.name,
+        String(agent.quotaTotal),
+        `${(agent.commissionRate * 100).toFixed(0)}%`,
+        String(store.listBrandsByAgent(agent.username).length),
+        String(agent.createdAt).slice(0, 10),
+      ]),
+    );
     return 0;
   });
 }
@@ -2819,6 +2921,7 @@ const HANDLERS = {
   share: cmdShare,
   weekly: cmdWeekly,
   client: cmdClient,
+  agent: cmdAgent,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

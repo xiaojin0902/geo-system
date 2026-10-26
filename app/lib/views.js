@@ -15,11 +15,11 @@ let THEME = { title: '恒野 GEO', logo: '恒野 <i>GEO</i>', color: '#7c5cff', 
 
 // 动作类页面：客户不能执行时（托管/到期）从导航里隐藏，避免点了才报错
 const ACTION_PATHS = new Set(['/run-diagnose', '/tools', '/distribution', '/pipeline', '/video', '/doctor']);
-let NAV_POLICY = { canAct: true };
+let NAV_POLICY = { canAct: true, role: 'admin' };
 
 /** 设置本请求的导航策略（每请求重置，避免串台） */
 export function setNavPolicy(policy = {}) {
-  NAV_POLICY = { canAct: policy.canAct !== false };
+  NAV_POLICY = { canAct: policy.canAct !== false, role: policy.role ?? 'admin' };
 }
 
 /** 设置进程内主题（白标） */
@@ -115,6 +115,7 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
     ['/tools', '工具箱'],
     ['/distribution', '分发矩阵'],
     ['/weekly', '周报'],
+    ['/agent', '代理总览'],
     ['/pipeline', '闭环验收'],
     ['/questions', '问题库'],
     ['/audit', '官网体检'],
@@ -123,7 +124,7 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
     ['/doctor', '环境自检'],
   ];
   const nav = items
-    .filter(([href]) => NAV_POLICY.canAct || !ACTION_PATHS.has(href))
+    .filter(([href]) => (NAV_POLICY.canAct || !ACTION_PATHS.has(href)) && (href !== '/agent' || NAV_POLICY.role === 'agent'))
     .map(([href, label]) => `<a href="${href}" class="${href === active ? 'on' : ''}">${esc(label)}</a>`)
     .join('');
   return `<!DOCTYPE html>
@@ -1176,6 +1177,61 @@ button{width:100%;margin-top:18px;background:var(--accent);color:#fff;border:0;b
   <button type="submit">登录</button>
   <div class="hint2">管理员首次启动时，终端会打印初始密码；客户账号由管理员创建。</div>
 </form></body></html>`;
+}
+
+/**
+ * 代理总览：服务商 → 代理 → 客户 三层中的代理视角。
+ * 代理只看自己名下的客户、自己的进货配额与分成，不碰全局设置。
+ */
+export function agentPage({
+  agent = '',
+  agentName = '',
+  quota = 0,
+  used = 0,
+  commissionRate = 0,
+  totalRevenue = 0,
+  clients = [],
+  generatedAt = '',
+} = {}) {
+  const pct = (v) => `${(Number(v) * 100).toFixed(0)}%`;
+  const rows = clients
+    .map(
+      ({ brand, sub, used: clientUsed }) => `<tr>
+      <td><b>${esc(brand.name ?? brand.slug)}</b><div class="sub mono">${esc(brand.slug)}</div></td>
+      <td><span class="badge ${sub.mode === 'managed' ? 'info' : 'mut'}">${esc(sub.modeName)}</span></td>
+      <td>${esc(sub.planName)}</td>
+      <td class="mono">${esc(sub.expireAt ? String(sub.expireAt).slice(0, 10) : '—')}</td>
+      <td class="mono">${esc(clientUsed)} / ${esc(sub.quotaQuestions)}</td>
+      <td>${sub.expired ? '<span class="badge bad">已到期</span>' : sub.active ? '<span class="badge ok">有效</span>' : '<span class="badge mut">未开通</span>'}</td>
+      <td><a href="/?brand=${encodeURIComponent(brand.slug)}" style="color:#b6a4ff">看板</a></td>
+    </tr>`,
+    )
+    .join('');
+  return layout({
+    title: '代理总览',
+    active: '/agent',
+    body: `
+<h1>代理总览 · ${esc(agentName)}</h1>
+<div class="sub">账号 ${esc(agent)} · 生成于 ${esc(generatedAt)}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">名下客户</div><div class="v">${esc(clients.length)}</div><div class="sub">其中 ${esc(clients.filter((c) => c.sub.active).length)} 个有效</div></div>
+  <div class="card"><div class="k">进货配额</div><div class="v">${esc(used)}<small> / ${esc(quota)}</small></div><div class="sub">本月已用题数</div></div>
+  <div class="card"><div class="k">本月客户营收</div><div class="v">¥${esc(totalRevenue)}</div><div class="sub">按当前套餐价估算</div></div>
+  <div class="card"><div class="k">分成比例</div><div class="v">${pct(commissionRate)}</div><div class="sub">约 ¥${esc(Math.round(totalRevenue * commissionRate))}</div></div>
+</div>
+
+<div class="hint">你可以：新增客户（/clients）、替客户开通/续费（/clients 的订阅表单）、查看每个客户的看板与周报。
+<b>不能</b>修改全局设置（白标、审计日志），也看不到其他代理的客户。</div>
+
+<h2>我的客户</h2>
+${
+    clients.length
+      ? `<table><thead><tr><th>客户</th><th>模式</th><th>套餐</th><th>到期</th><th>本月用量</th><th>状态</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="card empty">还没有客户。去 <a href="/clients" style="color:#b6a4ff">客户管理</a> 新建一个。</div>`
+  }
+`,
+  });
 }
 
 /**
