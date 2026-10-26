@@ -1118,6 +1118,76 @@ async function cmdPublish(flags) {
       throw new CliError(`content #${contentId} 不存在（或不属于品牌 ${slug}）`, '先运行 brief 生成内容，再用输出的 content id 登记发布。');
     }
 
+    // 先把正文取出来（浏览器填充与公众号 API 都要用）
+    let bodyText = String(content.bodyMd ?? content.bodyMarkdown ?? content.body ?? '');
+    if (!bodyText) {
+      const draftFile = path.join(DATA_DIR, 'drafts', `${content.id}.md`);
+      if (fs.existsSync(draftFile)) bodyText = fs.readFileSync(draftFile, 'utf8');
+    }
+
+    // 路线 A：浏览器半自动（知乎/头条/百家号/小红书/抖音/公众号后台）
+    // 只负责「开页面 + 填标题 + 填正文」，发布按钮永远留给人点。
+    const platformFlag = stringFlag(flags.platform, 'platform') ?? null;
+    if (flags.browser || platformFlag) {
+      const platformAlias = {
+        '知乎': 'zhihu', '知乎专栏': 'zhihu', '今日头条': 'toutiao', '头条': 'toutiao',
+        '百家号': 'baijiahao', '小红书': 'xiaohongshu', '抖音': 'douyin',
+        '公众号': 'wechat_mp', '微信公众号': 'wechat_mp', 'wechat': 'wechat_mp',
+      };
+      const platform = platformFlag ?? platformAlias[channel] ?? String(channel).toLowerCase();
+      let browserModule;
+      try {
+        browserModule = await import('../lib/publishers/browser.js');
+      } catch (error) {
+        throw new CliError('浏览器发布模块不可用（lib/publishers/browser.js）', [`详情：${error?.message ?? error}`]);
+      }
+      const outcome = await browserModule.openForPublish({
+        platform,
+        title: String(content.title ?? ''),
+        body: bodyText,
+        port: intFlag(flags.port, 'port', 9222),
+      });
+      const publicationId = store.createPublication({ contentId, channel, url: outcome.url ?? url, status: 'dry_run' });
+      const payload = { publicationId, contentId, channel, platform, browser: outcome };
+      if (flags.json) {
+        console.log(JSON.stringify(payload, null, 2));
+        return outcome.ok ? 0 : 1;
+      }
+      if (outcome.ok) {
+        console.log('✔ 已在浏览器里打开编辑器并填入稿件（没有点发布）');
+        console.log(`  平台：${platform} · 标题：${outcome.filled?.title ? '已填' : '未填'} · 正文：${outcome.filled?.body ? '已填' : '未填'}`);
+        console.log('  请在浏览器里检查排版/配图，然后自己点「发布」。');
+        console.log(`  发布记录：#${publicationId}（状态 dry_run，真发后可改为 published）`);
+        return 0;
+      }
+      console.log(`✖ 浏览器填充失败：${outcome.reason ?? '未知原因'}`);
+      if (outcome.hint) console.log(`  照这个命令重启 Chrome 后重试：${outcome.hint}`);
+      return 1;
+    }
+
+    // 路线 B：微信公众号官方 API（唯一有完整官方发布能力的平台）
+    let wechatOutcome = null;
+    const channelKey = String(channel).toLowerCase();
+    if (channelKey === 'wechat' || channel === '公众号' || channel === '微信公众号') {
+      try {
+        const wx = await import('../lib/publishers/wechat.js');
+        const wxReady = wx.wechatReadiness(process.env);
+        if (wxReady.ready) {
+          wechatOutcome = await wx.publishToWechat({
+            title: String(content.title ?? ''),
+            body: bodyText,
+            author: String(brand.name ?? ''),
+            env: process.env,
+            autoPublish: status === 'published' && String(process.env.WECHAT_AUTO_PUBLISH ?? '') === '1',
+          });
+        } else {
+          wechatOutcome = { ok: false, mode: 'draft', reason: `公众号 API 未就绪：${wxReady.reason}`, state: 'not_connected' };
+        }
+      } catch (error) {
+        wechatOutcome = { ok: false, reason: `公众号发布异常：${error?.message ?? error}` };
+      }
+    }
+
     // 渠道三态（未接入 / 模拟 / API）：模块可用就先过一遍渠道抽象，再落库回执
     let channelOutcome = null;
     try {
@@ -1148,6 +1218,20 @@ async function cmdPublish(flags) {
       }
     } catch {
       channelOutcome = null;
+    }
+
+    if (wechatOutcome) {
+      const mediaId = wechatOutcome.mediaId ? `media:${wechatOutcome.mediaId}` : null;
+      channelOutcome = {
+        ok: Boolean(wechatOutcome.ok),
+        state: wechatOutcome.ok ? 'api' : 'not_connected',
+        channelName: '微信公众号',
+        reason: wechatOutcome.ok ? '' : wechatOutcome.reason,
+        receipt: mediaId ? { receiptId: mediaId, url: url ?? null } : null,
+        hint: wechatOutcome.ok
+          ? (wechatOutcome.mode === 'publish' ? '已群发（可在公众号后台查看）' : '草稿已建；在公众号后台确认后群发，或设 WECHAT_AUTO_PUBLISH=1 自动群发')
+          : '检查 AppID/Secret 与 IP 白名单（errcode 40164 表示 IP 未放行）',
+      };
     }
 
     const publicationId = store.createPublication({ contentId, channel, url, status });
@@ -2148,6 +2232,56 @@ async function cmdVideo(flags) {
     const file = path.join(dir, `${contentId}.md`);
     fs.writeFileSync(file, mod.renderVideoScriptMarkdown(script), 'utf8');
 
+    // 可拍摄包：SRT 字幕 + 分镜 CSV（零配置也能用，直接丢进剪映/人工拍摄）
+    let shootFiles = null;
+    try {
+      const dh = await import('../lib/digital-human.js');
+      const pkg = dh.exportShootPackage(script);
+      const srtFile = path.join(dir, `${contentId}.srt`);
+      const csvFile = path.join(dir, `${contentId}-分镜.csv`);
+      fs.writeFileSync(srtFile, pkg.srt, 'utf8');
+      fs.writeFileSync(csvFile, pkg.csv, 'utf8');
+      shootFiles = { srt: srtFile, csv: csvFile };
+    } catch {
+      shootFiles = null;
+    }
+
+    // 数字人渲染（需配置服务商；没配就明确说，不假装能出片）
+    let renderOutcome = null;
+    if (flags.render) {
+      let dh;
+      try {
+        dh = await import('../lib/digital-human.js');
+      } catch (error) {
+        throw new CliError('数字人模块不可用（lib/digital-human.js）', [`详情：${error?.message ?? error}`]);
+      }
+      const ready = dh.readiness(process.env);
+      if (!ready.ready) {
+        renderOutcome = { ok: false, reason: ready.reason };
+      } else {
+        const submitted = await dh.submitRender({ script, env: process.env, brand });
+        if (!submitted.ok) {
+          renderOutcome = { ok: false, reason: submitted.reason };
+        } else {
+          renderOutcome = { ok: true, jobId: submitted.jobId, provider: submitted.provider, status: 'submitted' };
+          const timeoutMs = intFlag(flags.wait, 'wait', 60000);
+          const deadline = Date.now() + Math.max(5000, timeoutMs);
+          while (Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 8000));
+            const polled = await dh.pollRender({ jobId: submitted.jobId, env: process.env });
+            if (polled.ok && polled.url) {
+              renderOutcome = { ...renderOutcome, status: 'completed', url: polled.url };
+              break;
+            }
+            if (!polled.ok) {
+              renderOutcome = { ...renderOutcome, status: 'error', reason: polled.reason };
+              break;
+            }
+          }
+        }
+      }
+    }
+
     if (flags.json) {
       console.log(JSON.stringify({ contentId, file, script }, null, 2));
       return 0;
@@ -2155,6 +2289,20 @@ async function cmdVideo(flags) {
     console.log(mod.renderVideoScriptMarkdown(script));
     console.log('');
     console.log(`已写入：${file}`);
+    if (shootFiles) {
+      console.log(`可拍摄包：${shootFiles.srt}`);
+      console.log(`            ${shootFiles.csv}`);
+    }
+    if (flags.render) {
+      if (renderOutcome?.ok && renderOutcome.url) {
+        console.log(`数字人视频已生成（${renderOutcome.provider}）：${renderOutcome.url}`);
+      } else if (renderOutcome?.ok) {
+        console.log(`数字人任务已提交：job=${renderOutcome.jobId}（还没出片，稍后用 --wait 更长时间重试）`);
+      } else {
+        console.log(`数字人未出片：${renderOutcome?.reason ?? '未配置'}`);
+        console.log('可先用可拍摄包：把 .srt 与分镜 CSV 导入剪映，或按脚本人工拍摄。');
+      }
+    }
     return 0;
   });
 }
