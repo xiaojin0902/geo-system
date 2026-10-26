@@ -42,11 +42,11 @@ const CSS = `
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Microsoft YaHei",sans-serif}
 a{color:inherit;text-decoration:none}
-.nav{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:4px;padding:0 24px;height:52px;
+.nav{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:2px;padding:6px 18px;min-height:52px;flex-wrap:wrap;
 background:rgba(11,12,16,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .nav .logo{font-weight:700;letter-spacing:-.01em;margin-right:16px}
 .nav .logo i{color:var(--accent);font-style:normal}
-.nav a{padding:6px 12px;border-radius:8px;color:var(--dim);font-size:13px}
+.nav a{padding:6px 10px;border-radius:8px;color:var(--dim);font-size:13px;white-space:nowrap}
 .nav a:hover{background:var(--panel);color:var(--ink)}
 .nav a.on{background:rgba(124,92,255,.15);color:#b6a4ff}
 .nav .spacer{flex:1}
