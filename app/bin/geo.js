@@ -2157,7 +2157,9 @@ async function cmdAudit(flags) {
     ]);
   }
 
-  console.log(`正在体检：${target}`);
+  // --json 时把进度写 stderr，保证 stdout 是纯 JSON（否则下游 JSON.parse 会失败）
+  if (flags.json) console.error(`正在体检：${target}`);
+  else console.log(`正在体检：${target}`);
   const result = await mod.auditSite(target);
 
   if (flags.json) {

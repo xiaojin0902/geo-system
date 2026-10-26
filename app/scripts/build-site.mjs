@@ -576,7 +576,12 @@ function main() {
   // 官网体检结果（由 ops 工作流写入）
   try {
     const auditFile = path.join(DATA_DIR, 'audit-latest.json');
-    if (fs.existsSync(auditFile)) audit = JSON.parse(fs.readFileSync(auditFile, 'utf8'));
+    if (fs.existsSync(auditFile)) {
+      const rawAudit = fs.readFileSync(auditFile, 'utf8');
+      const start = rawAudit.indexOf('{');
+      // 容错：CLI 可能在 JSON 前打印进度行，直接 parse 会失败
+      audit = start >= 0 ? JSON.parse(rawAudit.slice(start)) : null;
+    }
   } catch { audit = null; }
 
   // 最近一次闭环验收报告
