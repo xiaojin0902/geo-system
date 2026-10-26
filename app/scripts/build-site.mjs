@@ -462,43 +462,147 @@ ${
   return layout({ title: '闭环验收', active: 'pipeline.html', body });
 }
 
-function buildOps({ repoUrl, generatedAt }) {
+function buildOps({ repoUrl, repoSlug, generatedAt }) {
   const body = `
 <h1>操作台</h1>
-<div class="sub">系统是静态站 + GitHub Actions 后端：功能靠触发工作流完成，结果自动回到本站在线更新 · ${esc(generatedAt)}</div>
+<div class="sub">在网页上直接执行：点按钮 → 触发 GitHub Actions → 云端跑完 → 本站自动更新 · ${esc(generatedAt)}</div>
 
-<div class="hint">静态托管（GitHub Pages）跑不了 Node 服务，所以所有「要执行」的功能都做成 GitHub Actions：
-你点一下 <b>Run workflow</b>，云端跑完会把数据提交回仓库并重新发布本站，约 1-3 分钟。</div>
+<div class="hint">
+  第一次使用：粘贴一个 GitHub 令牌（只存在你本机浏览器 localStorage，不会上传到任何服务器）。
+  <br>生成方式：<a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=geo-system-ops" target="_blank" style="color:#b6a4ff">GitHub → Settings → Developer settings → Tokens(classic)</a>
+  → 勾选 <span class="mono">repo</span> 和 <span class="mono">workflow</span> → Generate → 复制粘贴到下面。
+</div>
 
-<h2>① 每日自动（不用管）</h2>
+<div class="card">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input id="token" type="password" placeholder="粘贴 ghp_ 开头的令牌（只存本地）" style="flex:1;min-width:280px;background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+    <button id="save" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:9px 16px;cursor:pointer">保存令牌</button>
+    <button id="clear" style="background:transparent;color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:9px 12px;cursor:pointer">清除</button>
+  </div>
+  <div id="tokenState" class="sub" style="margin-top:8px"></div>
+</div>
+
+<h2>执行功能</h2>
+<table><thead><tr><th>功能</th><th>参数</th><th>操作</th></tr></thead><tbody>
+<tr><td>跑一轮诊断</td><td>
+  <select id="engines" style="background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px">
+    <option value="live">live（已配置的线上引擎）</option><option value="mock">mock（演示，不花钱）</option>
+  </select>
+  <input id="limit" type="number" value="12" min="1" max="50" style="width:70px;background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px;margin-left:6px">
+  <span class="sub">题</span></td>
+  <td><button data-act="diagnose" style="background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">执行</button></td></tr>
+<tr><td>官网可抓取体检</td><td><input id="url" placeholder="留空=用品牌配置里的官网" style="width:280px;background:#0a0b0f;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px"></td>
+  <td><button data-act="audit" style="background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">执行</button></td></tr>
+<tr><td>自动出题</td><td class="sub">三层 × 六意图，生成 36 题入问题库</td>
+  <td><button data-act="questions" style="background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">执行</button></td></tr>
+<tr><td>闭环验收（10 步）</td><td class="sub">建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测</td>
+  <td><button data-act="demo" style="background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">执行</button></td></tr>
+<tr><td>只重建站点</td><td class="sub">数据不变，只重新生成页面</td>
+  <td><button data-act="build" style="background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 14px;cursor:pointer">执行</button></td></tr>
+</tbody></table>
+
+<div class="card" style="margin-top:16px">
+  <div class="k">执行状态</div>
+  <div id="status" class="sub" style="margin-top:6px">待命。点「执行」后这里会显示进度。</div>
+  <div id="log" class="mono" style="margin-top:10px;white-space:pre-wrap;font-size:12px;color:var(--dim)"></div>
+</div>
+
+<h2>每日自动</h2>
 <table><thead><tr><th>工作流</th><th>时间</th><th>做什么</th></tr></thead><tbody>
-<tr><td><span class="mono">GEO 每日采集与发布</span></td><td>每天 07:12（北京时间）</td><td>真实引擎采集 12 题 → 判定 → 评分 → 分析 → 行动 → 重建站点</td></tr>
+<tr><td class="mono">GEO 每日采集与发布</td><td>每天 07:12（北京时间）</td><td>真实引擎采集 12 题 → 判定 → 评分 → 分析 → 行动 → 重建站点</td></tr>
 </tbody></table>
+<p class="sub">手动历史：<a href="${esc(repoUrl)}/actions" style="color:#b6a4ff" target="_blank">全部工作流运行记录</a></p>
 
-<h2>② 手动功能（点按钮）</h2>
-<table><thead><tr><th>功能</th><th>怎么触发</th><th>参数</th></tr></thead><tbody>
-<tr><td>跑一轮诊断</td><td rowspan="5"><a href="${esc(repoUrl)}/actions/workflows/ops.yml" style="color:#b6a4ff">打开操作工作流 → Run workflow</a></td><td><span class="mono">action=diagnose</span> · engines=live/mock · limit=12</td></tr>
-<tr><td>官网可抓取体检</td><td><span class="mono">action=audit</span> · url=留空则用品牌配置</td></tr>
-<tr><td>自动出题</td><td><span class="mono">action=questions</span></td></tr>
-<tr><td>闭环验收（10 步）</td><td><span class="mono">action=demo</span> · limit=8</td></tr>
-<tr><td>只重建站点</td><td><span class="mono">action=build</span></td></tr>
-</tbody></table>
+<h2>为什么不用服务器</h2>
+<p class="sub">GitHub Pages 托管静态页面，执行交给 GitHub Actions 的免费算力（每月 2000 分钟，当前用量每天约 2 分钟）。
+所以零成本、无冷启动、不需要维护服务器；数据在仓库里，天然有版本历史和回滚能力。</p>
 
-<h2>③ 看运行历史</h2>
-<p><a href="${esc(repoUrl)}/actions" style="color:#b6a4ff">全部工作流运行记录</a>（含日志，失败能看原因）</p>
+<div class="foot">仓库：<a href="${esc(repoUrl)}" style="color:#b6a4ff">${esc(repoSlug)}</a></div>
 
-<h2>为什么不是网页上直接点</h2>
-<p class="sub">GitHub Pages 只托管静态文件，没有服务端进程。要「网页上点一下就执行」，需要一台常驻服务器（Node + SQLite），成本约 ¥30/月；
-或者用带登录的云函数方案。当前免费方案用 GitHub Actions 当后端，功能一样，只是入口在 GitHub。</p>
+<script>
+const OWNER = ${JSON.stringify(repoSlug.split('/')[0])};
+const REPO = ${JSON.stringify(repoSlug.split('/')[1])};
+const TOKEN_KEY = 'geo_gh_token';
+const WF = 'ops.yml';
+const tok = () => localStorage.getItem(TOKEN_KEY) || '';
+const headers = () => ({ authorization: 'Bearer ' + tok(), accept: 'application/vnd.github+json', 'content-type': 'application/json' });
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
 
-<h2>如果想升级成真·网页操作</h2>
-<ul class="sub" style="line-height:2">
-<li>方案 A：Render/Railway 免费或低价实例部署 <span class="mono">geo serve</span>（本地控制台有全部 8 个页面 + 立即执行），加 Basic Auth，约 ¥0-30/月</li>
-<li>方案 B：Vercel + 外部数据库（Turso 免费版），serverless 执行短任务，长任务走队列</li>
-<li>方案 C：继续用本方案，零成本，操作入口在 GitHub</li>
-</ul>
+function paintToken(){
+  const has = !!tok();
+  document.getElementById('tokenState').innerHTML = has
+    ? '<span class="badge ok">已保存令牌（仅本机）</span> 长度 ' + tok().length
+    : '<span class="badge mut">未保存令牌</span> 需要粘贴一次才能执行';
+}
+document.getElementById('save').onclick = () => {
+  const v = document.getElementById('token').value.trim();
+  if (!v) return;
+  localStorage.setItem(TOKEN_KEY, v);
+  document.getElementById('token').value = '';
+  paintToken();
+};
+document.getElementById('clear').onclick = () => { localStorage.removeItem(TOKEN_KEY); paintToken(); };
+paintToken();
 
-<div class="foot">仓库：<a href="${esc(repoUrl)}" style="color:#b6a4ff">${esc(repoUrl.replace('https://github.com/', ''))}</a></div>`;
+async function api(path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, { ...opts, headers: headers() });
+  if (res.status === 204) return {};
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
+  return data;
+}
+
+async function dispatch(act) {
+  if (!tok()) { statusEl.innerHTML = '<span class="badge bad">先粘贴令牌</span>'; return; }
+  const inputs = { action: act };
+  if (act === 'diagnose') {
+    inputs.engines = document.getElementById('engines').value;
+    inputs.limit = document.getElementById('limit').value || '12';
+  }
+  if (act === 'audit') inputs.url = document.getElementById('url').value.trim();
+  if (act === 'demo') inputs.limit = '8';
+  statusEl.innerHTML = '正在触发 <b>' + act + '</b> …';
+  logEl.textContent = '';
+  try {
+    await api('/repos/' + OWNER + '/' + REPO + '/actions/workflows/' + WF + '/dispatches', {
+      method: 'POST', body: JSON.stringify({ ref: 'main', inputs }),
+    });
+    statusEl.innerHTML = '<span class="badge info">已触发</span> 等待云端开始…';
+    poll(act);
+  } catch (e) {
+    statusEl.innerHTML = '<span class="badge bad">触发失败</span> ' + e.message;
+    logEl.textContent = '常见原因：令牌没有 workflow 权限 / 令牌过期 / 不在同一账号下。';
+  }
+}
+
+async function poll(act) {
+  const started = Date.now();
+  const tick = async () => {
+    try {
+      const runs = await api('/repos/' + OWNER + '/' + REPO + '/actions/runs?per_page=3');
+      const run = (runs.workflow_runs || []).find(r => r.name && r.name.indexOf('操作台') === 0) || (runs.workflow_runs || [])[0];
+      if (!run) { setTimeout(tick, 3000); return; }
+      const age = (Date.now() - Date.parse(run.created_at)) / 1000;
+      statusEl.innerHTML = '<span class="badge ' + (run.status === 'completed' ? (run.conclusion === 'success' ? 'ok' : 'bad') : 'info') + '">'
+        + (run.status === 'completed' ? (run.conclusion === 'success' ? '完成' : '失败') : '运行中') + '</span> '
+        + 'run #' + run.id + ' · <a href="' + run.html_url + '" target="_blank" style="color:#b6a4ff">看日志</a>';
+      logEl.textContent = '已运行 ' + Math.round(age) + ' 秒。完成后本页数据会在 1-2 分钟内自动更新，刷新即可。';
+      if (run.status !== 'completed' && Date.now() - started < 12 * 60 * 1000) setTimeout(tick, 8000);
+      else if (run.status === 'completed' && run.conclusion === 'success') {
+        logEl.textContent = '✅ 已完成，2 分钟后刷新本页看新数据。';
+      }
+    } catch (e) {
+      logEl.textContent = '查询状态失败：' + e.message;
+    }
+  };
+  setTimeout(tick, 4000);
+}
+
+document.querySelectorAll('button[data-act]').forEach(btn => {
+  btn.addEventListener('click', () => dispatch(btn.dataset.act));
+});
+</script>`;
   return layout({ title: '操作台', active: 'ops.html', body });
 }
 
@@ -625,7 +729,7 @@ function main() {
   fs.writeFileSync(path.join(outDir, 'tools.html'), buildTools({ brand, generatedAt }));
   fs.writeFileSync(path.join(outDir, 'audit.html'), buildAudit({ audit, generatedAt }));
   fs.writeFileSync(path.join(outDir, 'pipeline.html'), buildPipeline({ demoReport, generatedAt }));
-  fs.writeFileSync(path.join(outDir, 'ops.html'), buildOps({ repoUrl, generatedAt }));
+  fs.writeFileSync(path.join(outDir, 'ops.html'), buildOps({ repoUrl, repoSlug: (process.env.GEO_REPO_SLUG || 'xiaojin0902/geo-system'), generatedAt }));
 
   // 最新报告 + 历史报告
   const reportDir = path.join(DATA_DIR, 'reports');
