@@ -311,6 +311,8 @@ export function resolveChannelState(channelId, { env = {} } = {}) {
   const channel = channelById(channelId);
   const source = env && typeof env === 'object' ? env : {};
 
+  // 公众号有官方发布 API：配了 AppID/Secret 就算 api 态，不需要 webhook
+  if (channel.id === 'wechat' && envText(source.WECHAT_APPID) && envText(source.WECHAT_SECRET)) return 'api';
   if (envText(source[webhookEnvKey(channel.id)])) return 'api';
   return envText(source.PUBLISH_DRY_RUN) !== '0' ? 'dry_run' : 'not_connected';
 }
