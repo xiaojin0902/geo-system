@@ -16,15 +16,39 @@ import { createDashscopeEngine, DASHSCOPE_META } from './dashscope.js';
 import { createDoubaoEngine, DOUBAO_META, doubaoReadiness } from './doubao.js';
 import { createKimiEngine, KIMI_META, kimiReadiness } from './kimi.js';
 import { createYuanbaoEngine, YUANBAO_META, yuanbaoReadiness } from './yuanbao.js';
+import { createCompatEngine } from './compat.js';
+import { PROVIDERS, providerOf, providerReadiness } from './providers.js';
 import { pickKey } from './http.js';
 
 /**
  * 引擎清单（唯一常量源）。顺序即报告/控制台的稳定展示顺序。
  * 五个中文引擎 + mock，对应 OmniRank 的通义/DeepSeek/豆包/Kimi/元宝。
  */
-const ENGINE_META = [MOCK_META, DEEPSEEK_META, DASHSCOPE_META, DOUBAO_META, KIMI_META, YUANBAO_META];
+const SPECIAL_META = [DEEPSEEK_META, DASHSCOPE_META, DOUBAO_META, KIMI_META, YUANBAO_META];
+const specialIds = new Set(SPECIAL_META.map((meta) => meta.id));
 
-const KEY_NAME_BY_ID = Object.freeze({
+/** 兼容供应商的展示名：标注是否支持服务端联网（对话模式 ≠ 搜索可见度） */
+function compatLabel(meta) {
+  const hasTools = Array.isArray(meta.tools) && meta.tools.length > 0;
+  return `${meta.label}${hasTools ? ' · 联网' : ' · 对话'}`;
+}
+
+/**
+ * 引擎清单（唯一常量源）：mock + 11 家真实引擎。
+ * 五家（DeepSeek/通义/豆包/Kimi/元宝）走专用适配器（联网方式各不相同），
+ * 其余六家（文心/智谱/混元/MiniMax/Gemini/ChatGPT）走 OpenAI 兼容工厂。
+ */
+const ENGINE_META = [
+  MOCK_META,
+  ...SPECIAL_META,
+  ...PROVIDERS.filter((meta) => !specialIds.has(meta.id)).map((meta) => ({
+    id: meta.id,
+    label: compatLabel(meta),
+    requiresKey: true,
+  })),
+];
+
+const SPECIAL_KEY_NAMES = Object.freeze({
   mock: null,
   deepseek: 'DEEPSEEK_API_KEY',
   dashscope: 'DASHSCOPE_API_KEY',
@@ -49,10 +73,14 @@ const EXTRA_READINESS = {
 export function engineReadiness(id, env = {}) {
   const check = EXTRA_READINESS[id];
   if (check) return check(env);
-  const keyName = KEY_NAME_BY_ID[id];
-  if (!keyName) return { ready: true, reason: '' };
-  const value = pickKey(env, keyName);
-  return value ? { ready: true, reason: '' } : { ready: false, reason: `未配置 ${keyName}` };
+  if (id === 'mock') return { ready: true, reason: '' };
+  const compatMeta = providerOf(id);
+  if (compatMeta) return providerReadiness(compatMeta, env);
+  const keyName = SPECIAL_KEY_NAMES[id];
+  if (!keyName) return { ready: false, reason: `未知引擎「${id}」` };
+  return pickKey(env, keyName)
+    ? { ready: true, reason: '' }
+    : { ready: false, reason: `未配置 ${keyName}` };
 }
 
 function engineIds() {
@@ -96,7 +124,9 @@ export function getEngine(id, { env = {}, fetchImpl } = {}) {
       return createKimiEngine({ env, fetchImpl });
     case 'yuanbao':
       return createYuanbaoEngine({ env, fetchImpl });
-    default:
+    default: {
+      if (providerOf(id)) return createCompatEngine(id, { env, fetchImpl });
+    }
       throw new Error(`未知引擎「${id}」。可用引擎：${engineIds().join('、')}`);
   }
 }

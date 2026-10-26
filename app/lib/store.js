@@ -731,6 +731,25 @@ export class Store {
 
   // ----------------------------------------------------------- publications
 
+  /** 某品牌全部发布记录（含内容标题，供分发矩阵页使用） */
+  listPublications(brandId) {
+    return this.#stmt(
+      `SELECT p.id, p.content_id, p.channel, p.url, p.status, p.created_at, c.title
+         FROM publications p
+         JOIN contents c ON c.id = p.content_id
+        WHERE c.brand_id = ?
+        ORDER BY p.id DESC`,
+    ).all(Number(brandId)).map((row) => ({
+      id: Number(row.id),
+      contentId: Number(row.content_id),
+      channel: row.channel,
+      url: row.url,
+      status: row.status,
+      createdAt: row.created_at,
+      title: row.title,
+    }));
+  }
+
   createPublication({ contentId, channel, url = null, status = 'dry_run' } = {}) {
     const result = this.#stmt(
       'INSERT INTO publications (content_id, channel, url, status, created_at) VALUES (?,?,?,?,?)',

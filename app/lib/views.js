@@ -81,11 +81,15 @@ export function layout({ title, active = '', body = '', brandName = '恒野', ri
   const items = [
     ['/', '总览'],
     ['/run-diagnose', '跑诊断'],
+    ['/cockpit', '语义份额驾驶舱'],
     ['/insights', '可见度分析'],
     ['/tools', '工具箱'],
+    ['/distribution', '分发矩阵'],
     ['/pipeline', '闭环验收'],
     ['/questions', '问题库'],
     ['/audit', '官网体检'],
+    ['/seo', 'SEO 体检'],
+    ['/video', '短视频脚本'],
     ['/doctor', '环境自检'],
   ];
   const nav = items
@@ -690,6 +694,389 @@ go.addEventListener('click', async () => {
 ${running ? `poll(${JSON.stringify(running)});` : ''}
 </script>`;
   return layout({ title: '闭环验收', active: '/pipeline', body, brandName: brand.name ?? '恒野' });
+}
+
+/** 简易 SVG 折线图（零依赖，服务端渲染，不需要前端图表库） */
+function sparkline(values, { width = 520, height = 120, color = '#7c5cff', label = '' } = {}) {
+  const nums = values.map((v) => (Number.isFinite(Number(v)) ? Number(v) : null));
+  const pts = nums.map((v, i) => (v === null ? null : [i, v])).filter(Boolean);
+  if (pts.length < 2) return `<div class="empty">数据不足，跑两轮后出趋势</div>`;
+  const max = Math.max(...pts.map((p) => p[1]), 1);
+  const min = Math.min(...pts.map((p) => p[1]), 0);
+  const span = max - min || 1;
+  const px = (i) => 10 + (i / Math.max(1, nums.length - 1)) * (width - 20);
+  const py = (v) => height - 12 - ((v - min) / span) * (height - 26);
+  const path = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${px(p[0]).toFixed(1)},${py(p[1]).toFixed(1)}`).join(' ');
+  const dots = pts
+    .map((p) => `<circle cx="${px(p[0]).toFixed(1)}" cy="${py(p[1]).toFixed(1)}" r="3" fill="${color}"/>`)
+    .join('');
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${esc(label)}">
+    <line x1="10" y1="${height - 12}" x2="${width - 10}" y2="${height - 12}" stroke="#252a36"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>
+    ${dots}
+  </svg>`;
+}
+
+/** 横向条形图（用于份额/分布对比） */
+function bars(items, { color = '#7c5cff', max } = {}) {
+  const list = items.filter((it) => Number(it.value) > 0).slice(0, 10);
+  const top = max ?? Math.max(...list.map((it) => Number(it.value)), 1);
+  if (!list.length) return `<div class="empty">暂无数据</div>`;
+  return `<div class="card">${list
+    .map((it) => {
+      const width = Math.max(2, (Number(it.value) / top) * 100);
+      return `<div style="margin-bottom:10px">
+        <div class="row" style="justify-content:space-between;display:flex;font-size:12px;margin-bottom:4px">
+          <span>${esc(it.label)}</span><span class="mono" style="color:var(--dim)">${esc(it.display ?? it.value)}</span>
+        </div>
+        <div style="height:8px;background:#0a0b0f;border:1px solid var(--line);border-radius:6px;overflow:hidden">
+          <div style="height:100%;width:${width.toFixed(1)}%;background:${it.color ?? color}"></div>
+        </div></div>`;
+    })
+    .join('')}</div>`;
+}
+
+/**
+ * 语义份额驾驶舱：对标摘星AI 的「驾驶舱」——
+ * 一屏看全「AI 里谁被提、说得多好、和谁比、引了谁、跨引擎差多少、趋势怎么走」。
+ * @param {{brand:object, runs:Array, runId:number|null, insights:object|null, previous:object|null,
+ *          trend:Array, engines:Array}} data
+ */
+export function cockpitPage({
+  brand = {},
+  runs = [],
+  runId = null,
+  insights = null,
+  previous = null,
+  trend = [],
+  engines = [],
+} = {}) {
+  const pct = (v) => `${((Number(v) || 0) * 100).toFixed(1)}%`;
+  const num = (v, d = 1) => (Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '—');
+  const runOptions = runs
+    .map(
+      (r) =>
+        `<option value="${esc(r.runId)}"${String(r.runId) === String(runId) ? ' selected' : ''}>#${esc(r.runId)} · ${esc(r.kind)} · ${r.total === null || r.total === undefined ? '无分' : esc(r.total)}分</option>`,
+    )
+    .join('');
+
+  if (!insights) {
+    return layout({
+      title: '语义份额驾驶舱',
+      active: '/cockpit',
+      brandName: brand.name ?? '恒野',
+      body: `<h1>语义份额驾驶舱</h1><div class="card empty" style="margin-top:16px">还没有可分析的运行。先去「跑诊断」跑一轮。</div>`,
+    });
+  }
+
+  const { sample, exposure, citations, sov, sentiment, engines: engineStats, verdictCounts, fanout, sameNameThreats } = insights;
+  const delta = (cur, prev, isPct = true) => {
+    if (prev === null || prev === undefined || !Number.isFinite(Number(prev))) return '';
+    const diff = Number(cur) - Number(prev);
+    const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
+    const color = diff > 0 ? '#4ade80' : diff < 0 ? '#f87171' : '#8b93a7';
+    return `<span style="color:${color};font-size:12px">${arrow} ${isPct ? (diff * 100).toFixed(1) + 'pt' : diff.toFixed(1)}</span>`;
+  };
+
+  const sentimentTotal = (sentiment.positive + sentiment.neutral + sentiment.negative) || 1;
+  const sentimentBar = `<div class="card">
+    <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;border:1px solid var(--line)">
+      <div style="width:${(sentiment.positive / sentimentTotal * 100).toFixed(1)}%;background:#22c55e"></div>
+      <div style="width:${(sentiment.neutral / sentimentTotal * 100).toFixed(1)}%;background:#3a4152"></div>
+      <div style="width:${(sentiment.negative / sentimentTotal * 100).toFixed(1)}%;background:#ef4444"></div>
+    </div>
+    <div class="sub" style="margin-top:8px">正面 ${esc(sentiment.positive)} · 中性 ${esc(sentiment.neutral)} · 负面 ${esc(sentiment.negative)}（得分 ${num(sentiment.score, 2)}）</div>
+  </div>`;
+
+  const sovBars = bars(
+    [
+      { label: `${brand.name ?? '本品牌'}（本品牌）`, value: sov.brandShare, display: pct(sov.brandShare), color: '#7c5cff' },
+      ...(sov.competitors ?? []).map((c) => ({ label: c.name, value: c.share, display: pct(c.share), color: '#22d3ee' })),
+    ],
+    { max: 1 },
+  );
+
+  const citationBars = bars(
+    (citations.byDomain ?? []).map((d) => ({
+      label: `${d.domain}（${d.typeLabel}）`,
+      value: d.share,
+      display: pct(d.share),
+      color: d.type === 'own' ? '#22c55e' : d.sameName ? '#ef4444' : d.type === 'registry' ? '#f59e0b' : '#7c5cff',
+    })),
+    { max: 1 },
+  );
+
+  const engineRows = (engineStats ?? [])
+    .map(
+      (e) => `<tr><td>${esc(engines.find((x) => x.id === e.engine)?.label ?? e.engine)}</td>
+        <td class="mono">${esc(e.answers)}</td><td class="mono">${esc(e.ok)}</td>
+        <td class="mono">${esc(e.mentioned)}</td>
+        <td class="mono" style="color:${e.mentionRate >= 0.5 ? '#4ade80' : e.mentionRate > 0 ? '#fbbf24' : '#f87171'}">${pct(e.mentionRate)}</td></tr>`,
+    )
+    .join('');
+
+  const verdictBars = bars(
+    Object.entries(verdictCounts ?? {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => ({
+        label:
+          { recommended: '推荐', conditionally_recommended: '条件推荐', candidate: '候选', listed: '列入', mentioned: '仅提及', not_mentioned: '未提及', ambiguous: '歧义', unknown: '未知', refused: '拒答', engine_error: '引擎错误' }[k] ?? k,
+        value: v,
+        display: String(v),
+        color: k === 'recommended' || k === 'conditionally_recommended' ? '#22c55e' : k === 'not_mentioned' || k === 'engine_error' ? '#ef4444' : '#7c5cff',
+      })),
+    { max: sample.total || 1 },
+  );
+
+  const threatList = (sameNameThreats ?? []).length
+    ? `<div class="hint" style="border-color:#ef4444;background:rgba(239,68,68,.07)">
+        <b>同名实体威胁</b>（AI 讲你的品牌名时，引的是别家）
+        <ul style="margin:6px 0 0;padding-left:20px">${sameNameThreats.map((t) => `<li>${esc(t.message)}</li>`).join('')}</ul>
+      </div>`
+    : '';
+
+  const body = `
+<h1>语义份额驾驶舱</h1>
+<div class="sub">一屏看全：AI 里谁被提、说得多好、和谁比、引了谁、跨引擎差多少、趋势怎么走 · ${esc([brand.city, brand.industry].filter(Boolean).join(' · '))}</div>
+
+<div class="row" style="margin:16px 0">
+  <label class="sub">选择运行</label>
+  <select id="runSel">${runOptions}</select>
+  <span class="sub">有效样本 ${esc(sample.ok)} / ${esc(sample.total)}</span>
+</div>
+
+<div class="grid g4">
+  <div class="card"><div class="k">语义份额 SoV</div><div class="v">${pct(sov.brandShare)} ${delta(sov.brandShare, previous?.sov?.brandShare)}</div>
+    <div class="sub">本品牌提及 ${esc(sov.brandMentions)} 次</div></div>
+  <div class="card"><div class="k">提及率</div><div class="v">${pct(sample.mentionRate)} ${delta(sample.mentionRate, previous?.sample?.mentionRate)}</div>
+    <div class="sub">有效回答中被提到</div></div>
+  <div class="card"><div class="k">自有站点引用占比</div><div class="v">${pct(citations.ownShare)} ${delta(citations.ownShare, previous?.citations?.ownShare)}</div>
+    <div class="sub">共 ${esc(citations.total)} 条引用 / ${esc(citations.uniqueDomains)} 域名</div></div>
+  <div class="card"><div class="k">情感得分</div><div class="v">${num(sentiment.score, 2)}</div>
+    <div class="sub">正 ${esc(sentiment.positive)} / 负 ${esc(sentiment.negative)}</div></div>
+</div>
+
+<h2>趋势（近 ${esc(trend.length)} 轮）</h2>
+<div class="card">
+  <div class="sub" style="margin-bottom:6px">总分（0-100）</div>
+  ${sparkline(trend.map((t) => t.total), { color: '#7c5cff', label: '总分趋势' })}
+  <div class="sub" style="margin:12px 0 6px">提及率</div>
+  ${sparkline(trend.map((t) => t.mentionRate), { color: '#22d3ee', label: '提及率趋势' })}
+  <div class="sub" style="margin-top:8px">${trend.map((t) => `#${esc(t.runId)}`).join(' · ')}</div>
+</div>
+
+<h2>多引擎覆盖（摘星AI 的「11 大模型」在这里逐家看）</h2>
+${
+    engineRows
+      ? `<table><thead><tr><th>引擎</th><th>回答数</th><th>有效</th><th>提及</th><th>提及率</th></tr></thead><tbody>${engineRows}</tbody></table>`
+      : `<div class="card empty">暂无引擎分布</div>`
+  }
+<div class="sub" style="margin-top:8px">引擎配置状态见「环境自检」；未配置密钥的引擎不会出现在这里。</div>
+
+<h2>情感倾向</h2>
+${sentimentBar}
+
+<h2>竞品语义份额（SoV）</h2>
+${sovBars}
+
+<h2>引用源份额（AI 在引谁）</h2>
+${citationBars}
+${threatList}
+
+<h2>判定分布（10 态）</h2>
+${verdictBars}
+
+<div class="sub" style="margin-top:26px">曝光质量：篇幅占比 ${pct(exposure.avgWordShare)} · 位置权重 ${num(exposure.avgPositionWeight, 3)} · 首句命中率 ${pct(exposure.firstSentenceRate)}
+｜ fan-out ${esc(fanout?.unique ?? 0)} 条改写词</div>
+
+<script>
+document.getElementById('runSel').addEventListener('change', (e) => {
+  location.href = '/cockpit?run=' + encodeURIComponent(e.target.value);
+});
+</script>`;
+  return layout({ title: '语义份额驾驶舱', active: '/cockpit', body, brandName: brand.name ?? '恒野' });
+}
+
+/**
+ * 内容矩阵分发页：11 个渠道 × 内容 的覆盖矩阵。
+ * 对标摘星AI 的「内容矩阵分发」——不是看发了多少篇，而是看「每个渠道是否都铺到了」。
+ * @param {{brand?:object, channels?:Array, contents?:Array, publications?:Array}} data
+ */
+export function distributionPage({ brand = {}, channels = [], contents = [], publications = [] } = {}) {
+  const stateLabel = { not_connected: ['未接入', 'mut'], dry_run: ['模拟发布', 'warn'], api: ['已接入 API', 'ok'] };
+  const covered = new Map(); // `${contentId}|${channelName}` -> status
+  for (const pub of publications) covered.set(`${pub.contentId}|${pub.channel}`, pub.status);
+
+  const channelRows = channels
+    .map((c) => {
+      const [label, cls] = stateLabel[c.state] ?? [c.state, 'mut'];
+      const count = publications.filter((p) => p.channel === c.name).length;
+      return `<tr><td>${esc(c.name)}</td><td class="mono">${esc(c.id)}</td>
+        <td><span class="badge ${cls}">${esc(label)}</span></td>
+        <td class="mono">${esc(count)}</td><td class="sub">${esc(c.note ?? '')}</td></tr>`;
+    })
+    .join('');
+
+  const matrixHead = channels.map((c) => `<th style="text-align:center">${esc(c.name)}</th>`).join('');
+  const matrixRows = contents
+    .slice(0, 30)
+    .map((content) => {
+      const cells = channels
+        .map((c) => {
+          const status = covered.get(`${content.id}|${c.name}`);
+          const mark = status ? (status === 'published' ? '✅' : '○') : '·';
+          const title = status ? (status === 'published' ? '已真实发布' : '已模拟登记') : '未分发';
+          return `<td style="text-align:center" title="${esc(title)}">${mark}</td>`;
+        })
+        .join('');
+      return `<tr><td class="mono">#${esc(content.id)}</td><td>${esc((content.title ?? '—').slice(0, 28))}</td>${cells}</tr>`;
+    })
+    .join('');
+
+  const totalCells = contents.length * channels.length;
+  const filled = publications.length;
+  const coverage = totalCells ? Math.min(100, (filled / totalCells) * 100) : 0;
+  const missing = contents.length && channels.length
+    ? channels
+        .map((c) => ({ name: c.name, count: publications.filter((p) => p.channel === c.name).length }))
+        .filter((c) => c.count === 0)
+        .map((c) => c.name)
+    : [];
+
+  return layout({
+    title: '分发矩阵',
+    active: '/distribution',
+    brandName: brand.name ?? '恒野',
+    body: `
+<h1>内容矩阵分发</h1>
+<div class="sub">11 个渠道 × 全部内容 的覆盖矩阵 · 对标摘星AI 的「内容矩阵分发」</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">渠道数</div><div class="v">${esc(channels.length)}</div><div class="sub">${esc(channels.filter((c) => c.state === 'api').length)} 个已接入 API</div></div>
+  <div class="card"><div class="k">内容数</div><div class="v">${esc(contents.length)}</div><div class="sub">来自内容库</div></div>
+  <div class="card"><div class="k">分发记录</div><div class="v">${esc(filled)}</div><div class="sub">含 dry_run 与真实发布</div></div>
+  <div class="card"><div class="k">矩阵覆盖率</div><div class="v">${coverage.toFixed(1)}%</div><div class="sub">${esc(totalCells)} 个格子已填 ${esc(filled)}</div></div>
+</div>
+
+${
+    missing.length
+      ? `<div class="hint">还没铺过的渠道：<b>${esc(missing.join('、'))}</b>。用 <span class="mono">node bin/geo.js distribute --content &lt;id&gt; --channels "${esc(missing[0])}"</span> 补一发。</div>`
+      : ''
+  }
+
+<h2>渠道状态</h2>
+<table><thead><tr><th>渠道</th><th>ID</th><th>状态</th><th>已分发</th><th>说明</th></tr></thead><tbody>${channelRows}</tbody></table>
+<div class="sub" style="margin-top:8px">升级为真实发布：在 <span class="mono">app/.env</span> 配 <span class="mono">PUBLISH_&lt;渠道ID大写&gt;_WEBHOOK</span>。</div>
+
+<h2>内容 × 渠道 矩阵</h2>
+${
+    contents.length
+      ? `<div style="overflow-x:auto"><table><thead><tr><th>内容</th><th>标题</th>${matrixHead}</tr></thead><tbody>${matrixRows}</tbody></table></div>
+         <div class="sub" style="margin-top:8px">✅ 已真实发布 · ○ 已模拟登记 · · 未分发（点开渠道配置后可批量补）</div>`
+      : `<div class="card empty">还没有内容。先到「工具箱」或 CLI 生成 brief 与草稿。</div>`
+  }
+
+<h2>最近分发记录</h2>
+${
+    publications.length
+      ? `<table><thead><tr><th>内容</th><th>渠道</th><th>状态</th><th>时间</th></tr></thead><tbody>${publications
+          .slice(0, 12)
+          .map(
+            (p) =>
+              `<tr><td class="mono">#${esc(p.contentId)}</td><td>${esc(p.channel)}</td>
+               <td><span class="badge ${p.status === 'published' ? 'ok' : 'warn'}">${esc(p.status)}</span></td>
+               <td class="mono">${esc(String(p.createdAt ?? '').slice(0, 16).replace('T', ' '))}</td></tr>`,
+          )
+          .join('')}</tbody></table>`
+      : `<div class="card empty">还没有分发记录。运行 <span class="mono">node bin/geo.js distribute --all</span> 试一次。</div>`
+  }
+`,
+  });
+}
+
+/**
+ * SEO 体检页（对标摘星AI「GEO+SEO+短视频SEO 三位一体」的 SEO 侧）。
+ * 数据来自 `geo seo` 写入的 data/seo/latest.json。
+ */
+export function seoPage({ brand = {}, result = null } = {}) {
+  if (!result) {
+    return layout({
+      title: 'SEO 体检',
+      active: '/seo',
+      brandName: brand.name ?? '恒野',
+      body: `<h1>SEO 体检</h1><div class="card empty" style="margin-top:16px">还没有结果。运行 <span class="mono">node bin/geo.js seo --url &lt;网址&gt;</span> 生成。</div>`,
+    });
+  }
+  const badge = (level) =>
+    `<span class="badge ${level === 'blocker' ? 'bad' : level === 'warn' ? 'warn' : 'mut'}">${esc(level)}</span>`;
+  const rows = (result.checks ?? [])
+    .map(
+      (c) => `<tr><td>${c.ok ? '<span class="badge ok">通过</span>' : badge(c.level)}</td>
+        <td><b>${esc(c.label)}</b><div class="sub">${esc(c.detail)}</div>
+        ${c.ok ? '' : `<div class="sub" style="color:#8b93a7;margin-top:4px">修复：${esc(c.fix)}</div>`}</td></tr>`,
+    )
+    .join('');
+  const m = result.metrics ?? {};
+  const recs = (result.recommendations ?? []).map((r) => `<li>${esc(r)}</li>`).join('');
+  const video = result.videoSeo ?? {};
+  const body = `
+<h1>SEO 体检</h1>
+<div class="sub">传统 SEO + 短视频 SEO · ${esc(result.url ?? '')}${result.keyword ? ' · 关键词「' + esc(result.keyword) + '」' : ''}</div>
+
+<div class="grid g4" style="margin:16px 0">
+  <div class="card"><div class="k">SEO 评分</div><div class="v">${esc(result.score)}<small> / 100</small></div><div class="sub">${esc(result.level ?? '')}</div></div>
+  <div class="card"><div class="k">通过 / 待修</div><div class="v">${esc((result.checks ?? []).filter((c) => c.ok).length)}<small> / ${esc((result.checks ?? []).filter((c) => !c.ok).length)}</small></div><div class="sub">阻断 ${esc((result.checks ?? []).filter((c) => !c.ok && c.level === 'blocker').length)}</div></div>
+  <div class="card"><div class="k">标题 / 词数</div><div class="v" style="font-size:16px">${esc(m.titleLen ?? 0)} 字 / ${esc(m.wordCount ?? 0)}</div><div class="sub">H1 ${esc(m.h1Count ?? 0)} · H2 ${esc(m.h2Count ?? 0)}</div></div>
+  <div class="card"><div class="k">图片 alt 覆盖</div><div class="v" style="font-size:16px">${esc(m.imgCount ?? 0)} 张 / 缺 ${esc(m.imgNoAlt ?? 0)}</div><div class="sub">JSON-LD ${esc(m.jsonLdCount ?? 0)} 段</div></div>
+</div>
+
+<h2>检查明细</h2>
+<table><thead><tr><th>结果</th><th>检查项与修复</th></tr></thead><tbody>${rows}</tbody></table>
+
+<h2>短视频 SEO 建议</h2>
+<div class="card"><div class="sub">标题长度 ${esc(video.titleLen ?? 0)} 字 · 话题 ${esc(video.hashtagCount ?? 0)} 个 · 封面：${esc(video.coverHint ?? '—')}</div>
+<ul style="margin:8px 0 0;padding-left:20px;line-height:1.9">${(video.tips ?? []).map((t) => `<li>${esc(t)}</li>`).join('') || '<li class="sub">暂无建议</li>'}</ul></div>
+
+<h2>行动建议</h2>
+${recs ? `<div class="card"><ol style="margin:0;padding-left:20px;line-height:2">${recs}</ol></div>` : '<div class="card empty">没有额外建议</div>'}
+
+<div class="hint">这个页面与「官网体检」（查 AI 可抓取性）互补：一个查「能不能被 AI 抓」，一个查「传统搜索与短视频搜索能不能排好」。两个都过，才是三位一体的基础。</div>`;
+  return layout({ title: 'SEO 体检', active: '/seo', body, brandName: brand.name ?? '恒野' });
+}
+
+/**
+ * 短视频脚本页（对标摘星AI「AI 短视频矩阵」的脚本层）。
+ * 只展示 `geo video` 产出的可拍摄脚本；视频渲染/数字人不在范围内。
+ */
+export function videoPage({ brand = {}, files = [], selected = null, content = '' } = {}) {
+  const list = files
+    .map(
+      (f) =>
+        `<a href="/video?file=${encodeURIComponent(f.id)}" style="display:block;padding:9px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;${f.id === selected ? 'background:rgba(124,92,255,.14);border-color:#4b3fa8' : ''}">
+          <b>#${esc(f.id)}</b> <span class="sub">${esc(f.title)}</span></a>`,
+    )
+    .join('');
+  const body = `
+<h1>短视频脚本</h1>
+<div class="sub">文章 → 口播稿 / 分镜 / 标题 / 话题 / 封面 / 合规检查 · 对标摘星AI 的「AI 短视频矩阵」脚本层</div>
+
+<div class="grid g2" style="margin-top:16px">
+  <div>
+    <h2>已生成脚本（${esc(files.length)}）</h2>
+    ${list || '<div class="card empty">还没有脚本。运行 <span class="mono">node bin/geo.js video --content &lt;id&gt;</span> 生成。</div>'}
+  </div>
+  <div>
+    <h2>${selected ? '脚本 #' + esc(selected) : '预览'}</h2>
+    <div class="card">${
+      content
+        ? `<pre class="mono" style="white-space:pre-wrap;line-height:1.7;margin:0;font-size:12.5px">${esc(content)}</pre>`
+        : `<div class="empty">左侧选一个脚本预览</div>`
+    }</div>
+  </div>
+</div>
+
+<div class="hint">说明：这里产出的是「可拍摄的脚本」，不含视频渲染与数字人（需要外部视频模型/付费服务）。脚本已内置合规检查：绝对化用语、效果承诺、无来源数字会在生成时被标出。</div>`;
+  return layout({ title: '短视频脚本', active: '/video', body, brandName: brand.name ?? '恒野' });
 }
 
 /**

@@ -57,11 +57,15 @@ function fakeResponse(status, text) {
 // 引擎清单与选择
 // ---------------------------------------------------------------------------
 
-test('listEngines 返回唯一引擎清单（mock + 5 个中文引擎）', () => {
+test('listEngines 返回唯一引擎清单（mock + 11 家 AI 引擎）', () => {
   const engines = listEngines();
   assert.deepEqual(
     engines.map((engine) => engine.id),
-    ['mock', 'deepseek', 'dashscope', 'doubao', 'kimi', 'yuanbao'],
+    [
+      'mock',
+      'deepseek', 'dashscope', 'doubao', 'kimi', 'yuanbao',
+      'wenxin', 'zhipu', 'hunyuan', 'minimax', 'gemini', 'openai',
+    ],
   );
   assert.equal(engines[0].requiresKey, false);
   assert.equal(engines[1].requiresKey, true);

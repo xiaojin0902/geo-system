@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // 线上入口：Render/Railway/Fly 等 PaaS 用 `node server.js` 启动。
 // 与本地 `geo serve` 是同一套控制台（8 个页面、可立即执行）。
+import { loadEnv } from './app/lib/config.js';
 import { startServer } from './app/lib/server.js';
+
+// 先加载 app/.env，否则控制台进程读不到引擎密钥（CLI 里会加载，服务进程必须显式加载）
+loadEnv();
 
 const port = Number(process.env.PORT) || 8787;
 const auth =

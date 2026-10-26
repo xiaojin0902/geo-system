@@ -33,6 +33,9 @@ const HELP = `
   questions  自动出题：按三层六意图生成用户会问 AI 的问题
   schedule   生成定时任务配置（crontab / launchd），把诊断与监测自动化
   rejudge    用最新判定规则离线重判某一轮（不重新采集，不花钱）
+  video      把内容转成短视频脚本（口播/分镜/标题/话题/合规）
+  seo        传统 SEO + 短视频 SEO 体检（对标摘星AI 三位一体）
+  distribute 内容矩阵分发：把内容批量投到多个渠道（dry_run / 真实 API）
   demo       端到端闭环验收：建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测
   serve      启动本地网页控制台（跑诊断 / 看报告 / 问题库 / 官网体检）
   doctor     环境自检：还差什么才能跑真实数据
@@ -59,6 +62,9 @@ const HELP = `
   node bin/geo.js plan [--run <id>] [--json]
   node bin/geo.js questions [--generate] [--count 24] [--seed 1] [--write] [--json]
   node bin/geo.js schedule [--engines live] [--limit 20] [--json] [--write]
+  node bin/geo.js video --content <id> [--style 口播科普] [--duration 60] [--json]
+  node bin/geo.js seo --url <网址> [--keyword <词>] [--json]
+  node bin/geo.js distribute --content <id> [--channels 知乎,头条] [--all] [--live] [--json]
   node bin/geo.js demo [--brand hengye] [--limit 12] [--questions 24] [--json]
   node bin/geo.js rejudge --run <id> [--json]
   node bin/geo.js serve [--port 8787] [--no-open] [--brand hengye]
@@ -2093,6 +2099,196 @@ async function cmdRejudge(flags) {
   return 0;
 }
 
+
+/** 短视频脚本：把内容转成可拍摄脚本（对标摘星AI 的 AI 短视频矩阵）。 */
+async function cmdVideo(flags) {
+  const slug = brandSlug(flags);
+  const contentId = intFlag(flags.content, 'content', undefined);
+  if (contentId === undefined) {
+    throw new CliError('缺少 --content <内容 id>', [
+      '先用 brief 生成内容：node bin/geo.js brief --brand ' + slug + ' --keyword "<词>"',
+      '再写稿：node bin/geo.js write --brand ' + slug + ' --content <id>',
+    ]);
+  }
+  let mod;
+  try {
+    mod = await import('../lib/video-script.js');
+  } catch (error) {
+    throw new CliError('短视频脚本模块不可用（lib/video-script.js）', [`详情：${error?.message ?? error}`]);
+  }
+
+  return withStore(async (store) => {
+    const brand = store.getBrand(slug);
+    if (!brand) throw new CliError(`品牌「${slug}」还没有初始化`);
+    const content = store.listContents(brand.id).find((item) => item.id === contentId);
+    if (!content) throw new CliError(`content #${contentId} 不存在`);
+
+    let body = String(content.bodyMd ?? content.bodyMarkdown ?? content.body ?? '');
+    if (!body) {
+      const draftFile = path.join(DATA_DIR, 'drafts', `${contentId}.md`);
+      if (fs.existsSync(draftFile)) body = fs.readFileSync(draftFile, 'utf8');
+    }
+    if (!body.trim()) {
+      throw new CliError(`content #${contentId} 还没有正文`, [`先写稿：node bin/geo.js write --brand ${slug} --content ${contentId}`]);
+    }
+
+    const style = stringFlag(flags.style, 'style') ?? '口播科普';
+    const duration = intFlag(flags.duration, 'duration', 60);
+    const script = mod.buildVideoScript({
+      title: String(content.title ?? ''),
+      body,
+      brief: content.brief ?? {},
+      brand,
+      style,
+      durationSec: duration,
+    });
+
+    const dir = path.join(DATA_DIR, 'videos');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `${contentId}.md`);
+    fs.writeFileSync(file, mod.renderVideoScriptMarkdown(script), 'utf8');
+
+    if (flags.json) {
+      console.log(JSON.stringify({ contentId, file, script }, null, 2));
+      return 0;
+    }
+    console.log(mod.renderVideoScriptMarkdown(script));
+    console.log('');
+    console.log(`已写入：${file}`);
+    return 0;
+  });
+}
+
+/** SEO 体检：传统 SEO + 短视频 SEO（对标摘星AI 的「GEO+SEO+短视频SEO」）。 */
+async function cmdSeo(flags) {
+  const target = stringFlag(flags.url, 'url');
+  if (!target) {
+    throw new CliError('缺少 --url <网址>', ['用法：node bin/geo.js seo --url https://sanrenxing.cn [--keyword "内容代运营"]']);
+  }
+  let mod;
+  try {
+    mod = await import('../lib/seo-check.js');
+  } catch (error) {
+    throw new CliError('SEO 检查模块不可用（lib/seo-check.js）', [`详情：${error?.message ?? error}`]);
+  }
+  const keyword = stringFlag(flags.keyword, 'keyword') ?? '';
+  console.error(`正在检查 SEO：${target}`);
+  const result = await mod.fetchAndAnalyzeSeo(target, { keyword });
+  if (result && result.ok === false) {
+    throw new CliError(`SEO 检查失败：${result.error ?? '未知错误'}`);
+  }
+  const dir = path.join(DATA_DIR, 'seo');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'latest.json');
+  fs.writeFileSync(file, JSON.stringify({ target, keyword, ...result }, null, 2), 'utf8');
+
+  if (flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return 0;
+  }
+  console.log(mod.renderSeoMarkdown(result));
+  console.log('');
+  console.log(`已写入：${file}`);
+  return 0;
+}
+
+
+/** 内容矩阵分发：一条内容投多个渠道（默认 dry_run，配了 webhook 才能真发）。 */
+async function cmdDistribute(flags) {
+  const slug = brandSlug(flags);
+  const contentId = intFlag(flags.content, 'content', undefined);
+  const all = Boolean(flags.all);
+  if (contentId === undefined && !all) {
+    throw new CliError('缺少 --content <id>（或 --all 分发全部内容）', [
+      '用法：node bin/geo.js distribute --content 3 --channels 知乎专栏,今日头条',
+      '或：node bin/geo.js distribute --all',
+    ]);
+  }
+
+  let mod;
+  try {
+    mod = await import('../lib/publish-channels.js');
+  } catch (error) {
+    throw new CliError('渠道模块不可用（lib/publish-channels.js）', [`详情：${error?.message ?? error}`]);
+  }
+
+  const live = Boolean(flags.live);
+  const channelFlag = stringFlag(flags.channels, 'channels');
+
+  return withStore(async (store) => {
+    const brand = store.getBrand(slug);
+    if (!brand) throw new CliError(`品牌「${slug}」还没有初始化`);
+    const contents = store.listContents(brand.id);
+    const targets = all ? contents : contents.filter((item) => item.id === contentId);
+    if (!targets.length) throw new CliError(`没有可分发的内容（content #${contentId} 不存在或还没生成）`);
+
+    const channels = mod.listChannels({ env: process.env });
+    const selected = channelFlag
+      ? channelFlag
+          .split(',')
+          .map((name) => name.trim())
+          .filter(Boolean)
+          .map((name) => {
+            const hit = channels.find((c) => c.name === name || c.id === name.toLowerCase());
+            if (!hit) throw new CliError(`未知渠道「${name}」`, [`可用：${channels.map((c) => c.name).join('、')}`]);
+            return hit;
+          })
+      : channels;
+
+    const results = [];
+    for (const content of targets) {
+      let body = String(content.bodyMd ?? content.bodyMarkdown ?? content.body ?? '');
+      if (!body) {
+        const draftFile = path.join(DATA_DIR, 'drafts', `${content.id}.md`);
+        if (fs.existsSync(draftFile)) body = fs.readFileSync(draftFile, 'utf8');
+      }
+      for (const channel of selected) {
+        const outcome = await mod.publishTo({
+          channel: channel.id,
+          content: { title: String(content.title ?? ''), body, contentId: content.id },
+          dryRun: !live,
+          env: process.env,
+        });
+        if (outcome.ok) {
+          store.createPublication({
+            contentId: content.id,
+            channel: channel.name,
+            url: outcome.receipt?.url ?? null,
+            status: live && channel.state === 'api' ? 'published' : 'dry_run',
+          });
+        }
+        results.push({
+          contentId: content.id,
+          channel: channel.name,
+          state: outcome.state,
+          ok: outcome.ok,
+          reason: outcome.reason ?? null,
+          receiptId: outcome.receipt?.receiptId ?? null,
+        });
+      }
+    }
+
+    const okCount = results.filter((r) => r.ok).length;
+    if (flags.json) {
+      console.log(JSON.stringify({ contentCount: targets.length, channelCount: selected.length, okCount, results }, null, 2));
+      return 0;
+    }
+
+    console.log(`分发完成：${targets.length} 条内容 × ${selected.length} 个渠道 = ${results.length} 次，成功 ${okCount}`);
+    const rows = results.map((r) => [
+      `#${r.contentId}`,
+      r.channel,
+      r.state,
+      r.ok ? '成功' : `失败：${r.reason ?? ''}`,
+      r.receiptId ?? '—',
+    ]);
+    printTable(['内容', '渠道', '状态', '结果', '回执'], rows);
+    console.log('');
+    console.log(live ? '真实发布模式：只有已接入 API 的渠道会真正发出。' : '当前是 dry_run：只登记与出回执，未真实发稿。加 --live 才真发。');
+    return 0;
+  });
+}
+
 // ---------------------------------------------------- doctor / audit / serve
 // 这三个命令解决的是「装完之后怎么用起来」，不是采集主链路，因此单独成段。
 
@@ -2260,6 +2456,9 @@ const HANDLERS = {
   runs: cmdRuns,
   insights: cmdInsights,
   aeo: cmdAeo,
+  video: cmdVideo,
+  seo: cmdSeo,
+  distribute: cmdDistribute,
   quote: cmdQuote,
   plan: cmdPlan,
   questions: cmdQuestions,

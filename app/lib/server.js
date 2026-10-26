@@ -24,12 +24,16 @@ import {
   dashboardPage,
   diagnosePage,
   doctorPage,
+  cockpitPage,
+  distributionPage,
   insightsPage,
   layout,
   notFoundPage,
   pipelinePage,
   questionsPage,
+  seoPage,
   toolsPage,
+  videoPage,
 } from './views.js';
 
 const REPORT_DIR = path.join(DATA_DIR, 'reports');
@@ -325,6 +329,61 @@ async function handle(req, res, slug, auth = null) {
     return html(res, 200, questionsPage({ brand: state.brand, questions }));
   }
 
+  if (req.method === 'GET' && pathname === '/video') {
+    const state = collectState(slug);
+    const dir = path.join(DATA_DIR, 'videos');
+    let files = [];
+    try {
+      if (fs.existsSync(dir)) {
+        files = fs
+          .readdirSync(dir)
+          .filter((f) => f.endsWith('.md'))
+          .map((f) => ({ id: f.replace(/\.md$/u, ''), title: '' }))
+          .reverse();
+      }
+    } catch {
+      files = [];
+    }
+    // 用内容标题补全列表名（有就补，没有就空着）
+    try {
+      const store = openStore(dbPath());
+      const brandRow = store.getBrand(slug);
+      if (brandRow) {
+        const contents = store.listContents(brandRow.id);
+        files = files.map((f) => ({
+          ...f,
+          title: (contents.find((c) => String(c.id) === String(f.id))?.title ?? '').slice(0, 30),
+        }));
+      }
+      store.close();
+    } catch {
+      /* 忽略：列表名不是关键路径 */
+    }
+    const wantFile = String(url.searchParams.get('file') ?? '');
+    const selected = files.some((f) => f.id === wantFile) ? wantFile : null;
+    let content = '';
+    if (selected) {
+      try {
+        content = fs.readFileSync(path.join(dir, `${selected}.md`), 'utf8');
+      } catch {
+        content = '';
+      }
+    }
+    return html(res, 200, videoPage({ brand: state.brand, files, selected, content }));
+  }
+
+  if (req.method === 'GET' && pathname === '/seo') {
+    const state = collectState(slug);
+    let result = null;
+    try {
+      const file = path.join(DATA_DIR, 'seo', 'latest.json');
+      if (fs.existsSync(file)) result = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      result = null;
+    }
+    return html(res, 200, seoPage({ brand: state.brand, result }));
+  }
+
   if (req.method === 'GET' && pathname === '/audit') {
     const target = url.searchParams.get('url') ?? '';
     let result = null;
@@ -431,6 +490,104 @@ async function handle(req, res, slug, auth = null) {
       res,
       200,
       toolsPage({ brand: state.brand, keywords, band, quote, questionCount: count, questions, channels }),
+    );
+  }
+
+  if (req.method === 'GET' && pathname === '/distribution') {
+    const state = collectState(slug);
+    let channels = [];
+    let publications = [];
+    let contents = [];
+    if (fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        const mod = await import('./publish-channels.js');
+        channels = mod.listChannels({ env: process.env });
+      } catch {
+        channels = [];
+      }
+      try {
+        store = openStore(dbPath());
+        const brandRow = store.getBrand(slug);
+        if (brandRow) {
+          contents = store.listContents(brandRow.id);
+          publications = store.listPublications ? store.listPublications(brandRow.id) : [];
+        }
+      } catch {
+        publications = [];
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return html(res, 200, distributionPage({ brand: state.brand, channels, contents, publications }));
+  }
+
+  if (req.method === 'GET' && pathname === '/cockpit') {
+    const state = collectState(slug);
+    const requested = Number(url.searchParams.get('run'));
+    const fallback = state.runs.find((run) => run.total !== null) ?? state.runs[0] ?? null;
+    const runId = Number.isFinite(requested) && requested > 0 ? requested : (fallback ? fallback.runId : null);
+    let insights = null;
+    let previous = null;
+    const trend = [];
+    if (runId && fs.existsSync(dbPath())) {
+      let store = null;
+      try {
+        store = openStore(dbPath());
+        const detail = store.getRunDetail(runId);
+        if (detail) insights = analyzeRun({ brand: detail.brand, rows: detail.rows });
+
+        // 上一轮（用于 delta 对比）
+        const ordered = state.runs.filter((run) => run.runId < runId);
+        for (const candidate of ordered) {
+          const prevDetail = store.getRunDetail(candidate.runId);
+          if (!prevDetail) continue;
+          previous = analyzeRun({ brand: prevDetail.brand, rows: prevDetail.rows });
+          break;
+        }
+
+        // 趋势：最近 8 轮（升序），每轮算总分与提及率
+        const recent = state.runs.slice(0, 8).slice().reverse();
+        for (const run of recent) {
+          const runDetail = store.getRunDetail(run.runId);
+          if (!runDetail) continue;
+          const runInsights = analyzeRun({ brand: runDetail.brand, rows: runDetail.rows });
+          trend.push({
+            runId: run.runId,
+            total: run.total ?? 0,
+            mentionRate: runInsights.sample?.mentionRate ?? 0,
+          });
+        }
+      } catch {
+        insights = insights ?? null;
+      } finally {
+        if (store) {
+          try {
+            store.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return html(
+      res,
+      200,
+      cockpitPage({
+        brand: state.brand,
+        runs: state.runs,
+        runId,
+        insights,
+        previous,
+        trend,
+        engines: engineStatus(),
+      }),
     );
   }
 

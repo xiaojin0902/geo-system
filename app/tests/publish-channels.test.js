@@ -67,13 +67,16 @@ function channelOf(list, id) {
 
 // ---------------------------------------------------------------- 定义与三态
 
-test('渠道清单：三态常量齐全，6 个渠道定义结构正确且不写死 state', () => {
+test('渠道清单：三态常量齐全，11 个渠道定义结构正确且不写死 state（对标摘星AI 矩阵）', () => {
   assert.deepEqual(CHANNEL_STATES, ['not_connected', 'dry_run', 'api']);
-  assert.ok(CHANNELS.length >= 6, '至少要有 6 个渠道');
+  assert.ok(CHANNELS.length >= 11, '至少要有 11 个渠道');
 
   assert.deepEqual(
     CHANNELS.map((channel) => channel.id),
-    ['zhihu', 'xiaohongshu', 'wechat', 'sohu', 'baijiahao', 'webhook'],
+    [
+      'zhihu', 'xiaohongshu', 'wechat', 'sohu', 'baijiahao', 'webhook',
+      'toutiao', 'netease', 'sina', 'douyin', 'bilibili',
+    ],
   );
 
   for (const channel of CHANNELS) {
@@ -128,7 +131,7 @@ test('PUBLISH_DRY_RUN=0 且没 webhook：全部 not_connected；webhook 仍可�
 
 test('未知渠道：解析和发布都抛中文错误，不返回假回执', async () => {
   assert.throws(
-    () => resolveChannelState('douyin'),
+    () => resolveChannelState('no-such-channel'),
     (error) => {
       assert.ok(error instanceof Error);
       assert.match(error.message, /未知发布渠道/);
@@ -137,7 +140,7 @@ test('未知渠道：解析和发布都抛中文错误，不返回假回执', as
   );
 
   await assert.rejects(
-    () => publishTo({ channel: 'douyin', content: CONTENT }),
+    () => publishTo({ channel: 'no-such-channel', content: CONTENT }),
     /未知发布渠道/,
   );
 });

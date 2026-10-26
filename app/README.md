@@ -22,7 +22,9 @@ cd hengye-geo
 | **总览** | 看最近评分、历史运行、密钥是否配好，点进任何一轮报告 |
 | **跑诊断** | 选引擎 + 题数，点一下就跑，输出实时滚动 |
 | **闭环验收** | 一键跑完 10 步（建库→出题→诊断→分析→行动→关键词→brief→写稿→发布→监测），看哪一步断了 |
+| **分发矩阵** | 11 个渠道 × 全部内容的覆盖矩阵（对标摘星AI 内容矩阵分发） |
 | **工具箱** | 报价 / 自动出题 / 发布渠道状态，不敲命令也能用 |
+| **语义份额驾驶舱** | SoV/提及率/自有引用占比/情感 + 近 8 轮趋势 + 多引擎矩阵 + 竞品份额 + 10 态分布 |
 | **可见度分析** | 引用源 / 竞品 SoV / 曝光质量 / 情感倾向（与报告第五章同源） |
 | **问题库** | 看 99 条「用户会问 AI 的问题」 |
 | **官网体检** | 检查网站能不能被 AI 爬虫抓到（不需要 Key，立刻可用） |
@@ -57,7 +59,7 @@ node bin/geo.js diagnose --brand hengye --engines live --limit 30
 - 没有 Key 时命令会明确报错并提示改用 mock，不会静默失败
 - 填完 Key 先跑 `node bin/geo.js doctor --probe`：它会真调一次 API，告诉你通没通、走的哪条检索路径
 
-**引擎覆盖（与 OmniRank 对齐的 5 个中文引擎）**：
+**引擎覆盖（11 家，对标摘星AI 的「11 大模型」）**：
 
 | 引擎 | 需要配置 | 联网方式 |
 |---|---|---|
@@ -66,6 +68,14 @@ node bin/geo.js diagnose --brand hengye --engines live --limit 30
 | 豆包 | `DOUBAO_API_KEY` + `DOUBAO_MODEL`（方舟接入点 ID） | 服务端 `web_search` 工具 |
 | Kimi | `KIMI_API_KEY` | 内置 `$web_search` 工具 |
 | 元宝 | `YUANBAO_BASE_URL` + `YUANBAO_API_KEY` | OpenAI 兼容中转（元宝无官方 API） |
+| 文心一言 | `QIANFAN_API_KEY` | 千帆 v2，`web_search` 工具 |
+| 智谱 GLM | `ZHIPU_API_KEY` | `web_search` 工具 |
+| 腾讯混元 | `HUNYUAN_API_KEY` | OpenAI 兼容 |
+| MiniMax | `MINIMAX_API_KEY` | OpenAI 兼容 |
+| Gemini | `GEMINI_API_KEY` | OpenAI 兼容端点 |
+| ChatGPT | `OPENAI_API_KEY` | OpenAI 兼容（对话模式） |
+
+新增一家只需在 `lib/engines/providers.js` 里加一行配置。
 
 配置是否齐全跑 `node bin/geo.js doctor` 看，它会逐引擎告诉你缺什么。
 
@@ -101,6 +111,9 @@ node bin/geo.js diagnose --brand hengye --engines live --limit 30
 | `node bin/geo.js aeo [--base-url <站点根>] [--out <目录>]` | 生成 AEO 资产：llms.txt、robots.txt（放行 9 个 AI 爬虫）、Organization/Service/FAQ JSON-LD |
 | `node bin/geo.js questions [--count 24] [--seed 1] [--write]` | 自动出题：三层 × 六意图，**题目里不含品牌名**（防引导性污染），`--write` 写进问题库 |
 | `node bin/geo.js quote --keywords "词:难度,..." [--band lite\|standard\|deep] [--tax 0.06]` | 报价：关键词价值分 → 篇数 × 单价 → 成本构成与毛利 |
+| `node bin/geo.js video --content <id> [--style 口播科普] [--duration 60]` | 内容 → 短视频脚本（口播/分镜/标题/话题/合规） |
+| `node bin/geo.js seo --url <网址> [--keyword <词>]` | 传统 SEO + 短视频 SEO 体检（对标三位一体） |
+| `node bin/geo.js distribute --content <id> [--channels 知乎专栏,今日头条] [--all] [--live]` | 内容矩阵分发：一条内容投 11 个渠道（默认 dry_run，配 webhook 才真发） |
 | `node bin/geo.js plan [--run <id>]` | Top10 行动 + 30 天计划（每行动带证据、owner、时限） |
 | `node bin/geo.js schedule [--write]` | 生成 crontab 定时任务（每日监测 / 每周诊断 / 每月体检），`--write` 出安装脚本 |
 | `node bin/geo.js demo [--limit 12] [--questions 24]` | **端到端闭环验收**：10 步真实调用 CLI 跑一遍，产出 `data/reports/demo-*.md` |

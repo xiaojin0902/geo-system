@@ -411,6 +411,25 @@ JS-only -20；llms/sitemap/jsonld 各 -5；description -3；canonical -2；不�
 - `sameNameDomainHints` 命中的域名在引用源分析里标为「同名实体站点（不可用）」，**不进机会缺口**，
   单独输出 `sameNameThreats`，并由 action-plan 转成「做品牌实体区分」的 P0 行动。
 
+## 3.28 引擎扩展到 11 家（2026-10-26 追加，对标摘星AI）
+
+`lib/engines/providers.js` 是「OpenAI 兼容供应商」注册表（端点/密钥/模型/联网工具），
+`lib/engines/compat.js` 由注册表生成引擎实例；DeepSeek/通义/豆包/Kimi/元宝因联网方式特殊保留专用适配器。
+当前 11 家：DeepSeek、通义千问、豆包、Kimi、元宝、文心一言、智谱GLM、腾讯混元、MiniMax、Gemini、ChatGPT。
+**纪律**：只有厂商确实支持服务端联网检索才声明 `tools`，否则 mode 落 `memory`，报告里可区分「搜索」与「记忆」。
+
+## 3.29 `lib/video-script.js` 与 `lib/seo-check.js`（2026-10-26 追加）
+
+- `buildVideoScript`：文章 → 口播稿（时间轴）/分镜/标题备选/话题/封面/合规检查/平台注意（不做视频渲染）。
+- `analyzeSeo` / `fetchAndAnalyzeSeo`：传统 SEO（TDK/H 结构/canonical/OG/JSON-LD/alt/内链/词数/robots/sitemap）+ 短视频 SEO 建议。
+- 控制台：`/cockpit` 语义份额驾驶舱（零依赖 SVG 图表）。
+
+## 3.30 内容矩阵分发（2026-10-26 追加，对标摘星AI 内容矩阵）
+
+`lib/publish-channels.js` 的 `CHANNELS` 扩到 11 个（知乎/小红书/公众号/搜狐/百家号/Webhook/头条/网易/新浪/抖音/B站）。
+`geo distribute` 支持单条或 `--all` 批量投递，默认 dry_run 出回执，`--live` 且渠道为 api 态才真正发布；
+`store.listPublications()` 提供矩阵数据，控制台 `/distribution` 渲染「内容 × 渠道」覆盖矩阵与缺口提示。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

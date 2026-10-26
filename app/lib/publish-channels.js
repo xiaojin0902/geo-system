@@ -66,6 +66,36 @@ export const CHANNELS = Object.freeze([
     requires: [],
     note: '通用 HTTP 回调，把稿件推给任意自建发布服务',
   },
+  {
+    id: 'toutiao',
+    name: '今日头条',
+    requires: [],
+    note: '资讯分发主力，标题党会限流；配 webhook 后走真实发布 API',
+  },
+  {
+    id: 'netease',
+    name: '网易号',
+    requires: [],
+    note: '门户分发，适合行业解读；配 webhook 后走真实发布 API',
+  },
+  {
+    id: 'sina',
+    name: '新浪看点',
+    requires: [],
+    note: '门户分发，收录较快；配 webhook 后走真实发布 API',
+  },
+  {
+    id: 'douyin',
+    name: '抖音',
+    requires: [],
+    note: '短视频/图文，配合 video-script 脚本；配 webhook 后走真实发布',
+  },
+  {
+    id: 'bilibili',
+    name: 'B站',
+    requires: [],
+    note: '中长视频与专栏，适合深度内容；配 webhook 后走真实发布',
+  },
 ]);
 
 /** 正文下限：低于 200 字的稿子发出去既不像文章，也过不了平台原创审核。 */
