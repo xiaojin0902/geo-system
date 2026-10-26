@@ -1,3 +1,4 @@
+import { systemEdition } from './branding.js';
 /**
  * lib/weekly.js
  * 客户周报：把「最近一轮 + 上一轮」的可见度数据整理成一份可以直接发给客户的周报。
@@ -969,7 +970,7 @@ export function renderWeeklyMarkdown(report) {
   lines.push(`- 生成时间：${safe.generatedAt ?? '—'}`);
   lines.push('');
   lines.push('---');
-  lines.push('本报告由恒野 GEO 自研版生成，数据仅供优化方向参考，不作为效果承诺。');
+  lines.push(`本报告由${systemEdition()}生成，数据仅供优化方向参考，不作为效果承诺。`);
   return lines.join('\n');
 }
 
@@ -1153,7 +1154,7 @@ export function renderWeeklyHtml(report) {
 最新一轮类型：${escapeHtml(KIND_LABEL[quality.latestKind] ?? quality.latestKind ?? '未知')}<br>
 数据提示：${escapeHtml(quality.warning || '无')}
 </div>
-<div class="wk-foot">本报告由恒野 GEO 自研版生成，数据仅供优化方向参考，不作为效果承诺。</div>
+<div class="wk-foot">本报告由${systemEdition()}生成，数据仅供优化方向参考，不作为效果承诺。</div>
 </div>
 </body>
 </html>`;

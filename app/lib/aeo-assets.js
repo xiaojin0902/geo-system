@@ -1,3 +1,4 @@
+import { systemName } from './branding.js';
 /**
  * lib/aeo-assets.js
  * AEO 技术层：为站点生成「给 AI 引擎看的资产」。
@@ -37,7 +38,7 @@ export const AI_CRAWLER_UA = Object.freeze([
 
 /** robots.txt 头部声明：告诉后来接手的人，这段删了 AI 引擎可能就进不来 */
 const ROBOTS_HEADER =
-  '# 由恒野 GEO 生成 · 放行 AI 爬虫（不要删除本段，否则 AI 引擎可能拿不到授权）';
+  '# 由 ' + systemName() + ' 生成 · 放行 AI 爬虫（不要删除本段，否则 AI 引擎可能拿不到授权）';
 
 // ---------------------------------------------------------------- 内部工具
 

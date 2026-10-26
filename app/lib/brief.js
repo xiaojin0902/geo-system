@@ -1,3 +1,4 @@
+import { systemEdition } from './branding.js';
 /**
  * 内容 brief（content-brief 负责）
  *
@@ -605,7 +606,7 @@ export function renderBriefMarkdown(brief = {}) {
   lines.push('');
   lines.push('---');
   lines.push('');
-  lines.push('恒野 GEO 自研版 · 内容 brief');
+  lines.push(`${systemEdition()} · 内容 brief`);
   lines.push('');
 
   return lines.join('\n');

@@ -89,7 +89,7 @@ test('robots.txt：9 个 AI 爬虫全部显式放行 + sitemap', () => {
   }
   assert.equal((text.match(/Allow: \//g) ?? []).length >= AI_CRAWLER_UA.length, true);
   assert.match(text, /Sitemap: https:\/\/a\.cn\/sitemap\.xml/);
-  assert.match(text, /^# 由恒野 GEO 生成/);
+  assert.match(text, /^# 由.+生成 · 放行 AI 爬虫/);
 });
 
 test('robots.txt：disallowPaths 逐条写入且补前导斜杠', () => {

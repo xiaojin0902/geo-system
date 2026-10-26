@@ -1,4 +1,4 @@
-// 恒野 GEO 自研版 · SQLite 存储层
+// GEO 系统 · SQLite 存储层
 // 契约见 SPEC.md §2 / §3.2：完整 schema + DAO，方法签名固定；JSON 字段序列化，时间一律 ISO，不做业务判断。
 // 说明：node:sqlite 在 Node 22 仍标记 Experimental（启动时会打印无害的 ExperimentalWarning）。
 import fs from 'node:fs';

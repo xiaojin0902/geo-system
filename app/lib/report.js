@@ -1,3 +1,4 @@
+import { systemEdition, systemName } from './branding.js';
 /**
  * 诊断报告渲染（content-brief 负责）
  *
@@ -572,7 +573,7 @@ export function renderReportMarkdown({ brand = {}, run = {}, detail = {}, score 
   blocks.push('## 八、数据说明与免责声明');
   blocks.push(dataNotesBlock({ brand: safeBrand, run, scoreView, rows, isDemo }));
   blocks.push('---');
-  blocks.push('恒野 GEO 自研版');
+  blocks.push(systemEdition());
 
   return `${blocks.join('\n\n')}\n`;
 }
@@ -755,7 +756,7 @@ ${BASE_CSS}
 `;
 
 /** 安全地把 Markdown 包成自包含单文件 HTML（内联 CSS、无 JS、无外链资源） */
-export function renderReportHtml(markdown, { title = '恒野 GEO 诊断报告', subtitle = '', demo = false } = {}) {
+export function renderReportHtml(markdown, { title = `${systemName()} 诊断报告`, subtitle = '', demo = false } = {}) {
   const source = String(markdown ?? '');
   const isDemo = demo === true || /DEMO 演示数据/.test(source);
   const banner = isDemo
@@ -835,7 +836,7 @@ ${banner}
 <p class="hint">共 ${list.length} 轮诊断。DEMO 为演示数据，live 为真实引擎采集。</p>
 ${table}
 </section>
-<footer class="site-footer">恒野 GEO 自研版</footer>
+<footer class="site-footer">${systemEdition()}</footer>
 </main>
 </body>
 </html>

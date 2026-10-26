@@ -478,6 +478,12 @@ CLI：`geo agent --add/--list/--report`、`geo client ... --agent <代理>`。
 执行：`geo bill`（写 data/reports/bill-<slug>-<month>.md）、`/billing` 看板（服务商/代理）。
 开通托管时自动写入 performance 默认口径；效果为负按 0 计。
 
+## 3.37 品牌名变量化（2026-10-26 追加）
+
+`lib/branding.js`：`systemName(env)` / `systemEdition(env)` / `systemTagline(env)`，读 `GEO_SYSTEM_NAME`、`GEO_SYSTEM_TAGLINE`。
+原先散落在 28 处的「恒野 GEO」全部改为变量引用（报告、周报、报价、brief、robots/llms、写入器提示、CLI 抬头、登录页、设置页占位）。
+优先级：设置页 `app_title`/`logo_text` > 环境变量 > 内置默认值。改名不再需要改代码。
+
 ## 4. 品牌配置 `brands/hengye.json`
 
 ```json

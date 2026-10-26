@@ -1,3 +1,4 @@
+import { systemName } from './branding.js';
 /**
  * lib/quote.js
  * GEO 报价与关键词价值评分（恒野内容工作室对客户报「做多少篇、多少钱」）。
@@ -384,7 +385,7 @@ export function renderQuoteMarkdown(quote) {
 
   const out = [];
 
-  out.push('# 恒野 GEO 内容报价');
+  out.push(`# ${systemName()} 内容报价`);
   out.push('');
   out.push(`- 档位：${data.bandLabel || '标准'}`);
   out.push(`- 关键词：${lines.length} 个，合计 ${totalArticles} 篇`);

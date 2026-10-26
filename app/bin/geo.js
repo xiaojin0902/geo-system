@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 恒野 GEO 自研版 · 命令行入口（SPEC §3.9）
+// GEO 系统 · 命令行入口（SPEC §3.9）
 // 只做编排：读配置 → 调 lib/* 模块 → 落 SQLite → 渲染报告 → 打印中文结果。
 // 其它成员负责的模块用动态 import 加载；未就绪时给出明确中文提示，绝不静默失败。
 // 退出码约定：成功 0；失败 1（process.exitCode = 1）。
@@ -10,9 +10,10 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { APP_ROOT, DATA_DIR, brandPath, dbPath, loadEnv } from '../lib/config.js';
 import { openStore } from '../lib/store.js';
+import { systemName, systemEdition } from '../lib/branding.js';
 
 const HELP = `
-恒野 GEO 自研版 · 命令行（node bin/geo.js）
+${systemEdition()} · 命令行（node bin/geo.js）
 
 用法：node bin/geo.js <命令> [选项]
 
@@ -1858,7 +1859,7 @@ async function cmdSchedule(flags) {
     `cd ${quote(APP_ROOT)} && ${quote(nodeBin)} ${quote(cli)} ${args} >> ${quote(logFile)} 2>&1`;
 
   const lines = [
-    '# ── 恒野 GEO 定时任务（复制到 crontab -e；也可用 --write 生成安装脚本）──',
+    `# ── ${systemName()} 定时任务（复制到 crontab -e；也可用 --write 生成安装脚本）──`,
     `# 品牌：${slug} ｜ 引擎：${engines} ｜ 生成时间：${new Date().toISOString()}`,
     '',
     '# 每天 07:12 监测：复跑核心题并与上一轮对比（续费依据就是这条曲线）',
@@ -1895,7 +1896,7 @@ async function cmdSchedule(flags) {
     return 0;
   }
 
-  console.log(`恒野 GEO 定时任务（品牌 ${slug}）`);
+  console.log(`${systemName()} 定时任务（品牌 ${slug}）`);
   console.log('');
   console.log(lines.join('\n'));
   console.log('');
@@ -1910,7 +1911,7 @@ async function cmdSchedule(flags) {
     const scriptFile = path.join(dir, 'install-hengye-geo-cron.sh');
     const script = [
       '#!/bin/bash',
-      '# 由 恒野 GEO 生成：安装定时任务（会备份现有 crontab）',
+      `# 由 ${systemName()} 生成：安装定时任务（会备份现有 crontab）`,
       'set -euo pipefail',
       'BACKUP="$HOME/crontab.backup.$(date +%Y%m%d%H%M%S)"',
       'crontab -l > "$BACKUP" 2>/dev/null || true',
@@ -1922,7 +1923,7 @@ async function cmdSchedule(flags) {
       ...lines.filter((line) => line && !line.startsWith('# ──')).map((line) => `echo ${JSON.stringify(line)} >> "$TMP"`),
       'crontab "$TMP"',
       'rm -f "$TMP"',
-      'echo "已安装恒野 GEO 定时任务"',
+      'echo "已安装 ${systemName()} 定时任务"',
     ].join('\n');
     fs.writeFileSync(scriptFile, `${script}\n`, 'utf8');
     fs.chmodSync(scriptFile, 0o755);
@@ -1991,7 +1992,7 @@ async function cmdDemo(flags) {
   };
 
   if (!flags.json) {
-    console.log(`恒野 GEO 端到端闭环验收（品牌 ${slug} · 引擎 mock · ${limit} 题）`);
+    console.log(`${systemName()} 端到端闭环验收（品牌 ${slug} · 引擎 mock · ${limit} 题）`);
     console.log('');
   }
 
@@ -2887,7 +2888,7 @@ async function cmdDoctor(flags) {
   }
 
   const ICON = { blocker: '✖', warn: '!', info: '·' };
-  console.log(`恒野 GEO · 环境自检（Node v${process.versions.node}）`);
+  console.log(`${systemName()} · 环境自检（Node v${process.versions.node}）`);
   console.log('');
   for (const check of report.checks) {
     const icon = check.ok ? '✔' : (ICON[check.level] ?? '?');
@@ -2994,7 +2995,7 @@ async function cmdServe(flags) {
   const { startServer } = await import('../lib/server.js');
   const { url, close } = await startServer({ port, brand: brandSlug(flags) });
 
-  console.log(`恒野 GEO 控制台已启动：${url}`);
+  console.log(`${systemName()} 控制台已启动：${url}`);
   console.log('  跑诊断 / 看报告 / 查问题库 / 体检官网都在这个页面里。');
   console.log('  按 Ctrl+C 停止。');
 

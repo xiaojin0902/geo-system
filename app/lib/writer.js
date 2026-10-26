@@ -1,3 +1,4 @@
+import { systemName } from './branding.js';
 /**
  * 内容生成 + 事实核查（Phase 3，SPEC §3.10；content-brief 负责）
  *
@@ -234,7 +235,7 @@ export function buildWritingPrompt({ brand = {}, brief = {}, question = null } =
   const title = safeString(brief?.title) || `${b.name || '品牌'}内容草稿`;
 
   const system = [
-    '你是「恒野 GEO」内容团队的中文写作助手，负责把给定事实写成可被 AI 搜索引用的问答/指南类文章。',
+    `你是「${systemName()}」内容团队的中文写作助手，负责把给定事实写成可被 AI 搜索引用的问答/指南类文章。`,
     '硬性规则：',
     '1. 只能使用【必须引用的可验证事实】里的事实；没有依据的数字、客户案例、资质、排名一律不写，改写成方法描述或标注「待补充可验证事实」。',
     `2. 全文禁止出现绝对化/承诺类用语：${banned.join('、')}。`,

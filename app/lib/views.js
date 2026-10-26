@@ -1,3 +1,4 @@
+import { systemName } from './branding.js';
 /**
  * lib/views.js
  * 本地控制台的 HTML 视图（纯函数，输入数据 → 输出完整 HTML 字符串）。
@@ -11,7 +12,7 @@
 
 
 // ── 白标主题：布局读取这里的值，服务端每请求按客户设置注入 ──
-let THEME = { title: '恒野 GEO', logo: '恒野 <i>GEO</i>', color: '#7c5cff', footer: '' };
+let THEME = { title: systemName(), logo: systemName(), color: '#7c5cff', footer: '' };
 
 // 动作类页面：客户不能执行时（托管/到期）从导航里隐藏，避免点了才报错
 const ACTION_PATHS = new Set(['/run-diagnose', '/tools', '/distribution', '/pipeline', '/video', '/doctor']);
@@ -1156,7 +1157,7 @@ export function videoPage({ brand = {}, files = [], selected = null, content = '
 /** 登录页：客户与管理员都用它进系统 */
 export function loginPage({ error = '', next = '/' } = {}) {
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · 恒野 GEO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · ${systemName()}</title>
 <meta name="robots" content="noindex"><style>${CSS}
 body{display:flex;align-items:center;justify-content:center;min-height:100vh}
 .box{width:360px;background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px;padding:28px}
@@ -1409,8 +1410,8 @@ export function settingsPage({ brand = {}, settings = {}, isAdmin = false, gener
 <div class="sub">客户看到的名字、颜色、页脚与用量上限 · 生成于 ${esc(generatedAt)}</div>
 
 <form id="settingsForm" class="card" style="margin-top:16px">
-  ${field('app_title', '系统名称', settings.app_title ?? '恒野 GEO', '显示在浏览器标题与页头')}
-  ${field('logo_text', 'Logo 文案', settings.logo_text ?? '恒野 GEO')}
+  ${field('app_title', '系统名称', settings.app_title ?? systemName(), '显示在浏览器标题与页头')}
+  ${field('logo_text', 'Logo 文案', settings.logo_text ?? systemName())}
   ${field('primary_color', '主色（HEX）', settings.primary_color ?? '#7c5cff')}
   ${field('footer_text', '页脚文案', settings.footer_text ?? '')}
   ${field('public_url', '对外访问地址', settings.public_url ?? '', '用于生成分享链接，如 https://geo.sanrenxing.cn')}

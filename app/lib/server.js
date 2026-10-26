@@ -1,3 +1,4 @@
+import { systemName } from './branding.js';
 /**
  * lib/server.js
  * 本地控制台服务（零依赖，node:http）。
@@ -393,8 +394,8 @@ async function handle(req, res, slug, auth = null) {
       const brandSettings = brandRow ? themeStore.listSettings(brandRow.id) : {};
       const merged = { ...globalSettings, ...brandSettings };
       setTheme({
-        title: merged.app_title || '恒野 GEO',
-        logo: merged.logo_text || '恒野 GEO',
+        title: merged.app_title || systemName(),
+        logo: merged.logo_text || systemName(),
         color: merged.primary_color || '#7c5cff',
         footer: merged.footer_text || '',
       });
