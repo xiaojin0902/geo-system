@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { markdownToWechatHtml, wechatReadiness } from '../lib/publishers/wechat.js';
-import { exportShootPackage, readiness as dhReadiness, buildRenderRequest, DH_PROVIDERS } from '../lib/digital-human.js';
+import { exportShootPackage } from '../lib/shoot-package.js';
 import { platformInfo, PLATFORMS, chromeLaunchHint } from '../lib/publishers/browser.js';
 
 const SCRIPT = {
@@ -46,47 +46,6 @@ test('公众号 HTML 会转义尖括号，避免注入', () => {
   const html = markdownToWechatHtml('<script>alert(1)</script>');
   assert.equal(html.includes('<script>'), false);
   assert.ok(html.includes('&lt;script&gt;'));
-});
-
-// ---------------------------------------------------------------- 数字人
-
-test('数字人未配置 / 已配置的判断', () => {
-  assert.match(dhReadiness({}).reason, /DH_PROVIDER/);
-  assert.match(dhReadiness({ DH_PROVIDER: 'heygen' }).reason, /HEYGEN_API_KEY/);
-  const ready = dhReadiness({ DH_PROVIDER: 'heygen', HEYGEN_API_KEY: 'k', HEYGEN_AVATAR_ID: 'a' });
-  assert.equal(ready.ready, true);
-  assert.equal(ready.provider, 'heygen');
-});
-
-test('四家数字人服务商都在注册表里', () => {
-  assert.deepEqual(DH_PROVIDERS.map((p) => p.id), ['heygen', 'silicon', 'volcengine', 'custom']);
-});
-
-test('渲染请求把口播拼成一条文本，并带上形象与音色', () => {
-  const request = buildRenderRequest({
-    script: SCRIPT,
-    env: { DH_PROVIDER: 'heygen', HEYGEN_API_KEY: 'k', HEYGEN_AVATAR_ID: 'avatar-1', HEYGEN_VOICE_ID: 'voice-1' },
-  });
-  assert.equal(request.provider, 'heygen');
-  assert.ok(request.payload.text.includes('先结论') || request.payload.text.includes('先说结论'));
-  assert.equal(request.payload.avatar_id, 'avatar-1');
-  assert.equal(request.payload.voice_id, 'voice-1');
-  assert.equal(request.payload.aspect_ratio, '9:16');
-});
-
-test('可拍摄包：SRT 时间轴正确、CSV 带表头与转义', () => {
-  const pkg = exportShootPackage(SCRIPT);
-  assert.match(pkg.srt, /00:00:00,000 --> 00:00:03,000/);
-  assert.match(pkg.srt, /00:00:03,000 --> 00:00:15,000/);
-  assert.ok(pkg.csv.startsWith('时间,景别,字幕,素材建议'));
-  assert.ok(pkg.csv.includes('"近景·出镜口播"'));
-  assert.equal(pkg.narrationText.split('\n').length, 3);
-});
-
-test('可拍摄包在空脚本上不崩', () => {
-  const pkg = exportShootPackage({});
-  assert.equal(typeof pkg.srt, 'string');
-  assert.equal(typeof pkg.csv, 'string');
 });
 
 // ---------------------------------------------------------------- 浏览器

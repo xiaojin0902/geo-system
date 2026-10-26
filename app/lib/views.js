@@ -1077,7 +1077,7 @@ ${recs ? `<div class="card"><ol style="margin:0;padding-left:20px;line-height:2"
 
 /**
  * 短视频脚本页（对标摘星AI「AI 短视频矩阵」的脚本层）。
- * 只展示 `geo video` 产出的可拍摄脚本；视频渲染/数字人不在范围内。
+ * 只展示 `geo video` 产出的可拍摄脚本（口播/分镜/SRT），不做视频渲染。
  */
 export function videoPage({ brand = {}, files = [], selected = null, content = '' } = {}) {
   const list = files
@@ -1106,7 +1106,7 @@ export function videoPage({ brand = {}, files = [], selected = null, content = '
   </div>
 </div>
 
-<div class="hint">说明：这里产出的是「可拍摄的脚本」，不含视频渲染与数字人（需要外部视频模型/付费服务）。脚本已内置合规检查：绝对化用语、效果承诺、无来源数字会在生成时被标出。</div>`;
+<div class="hint">说明：这里产出的是「可拍摄的脚本」——口播稿、分镜、标题、话题，配套可导出 SRT 字幕与分镜 CSV，直接交给拍摄或剪辑。脚本已内置合规检查：绝对化用语、效果承诺、无来源数字会在生成时被标出。</div>`;
   return layout({ title: '短视频脚本', active: '/video', body, brandName: brand.name ?? '恒野' });
 }
 

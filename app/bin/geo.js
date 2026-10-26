@@ -2241,8 +2241,8 @@ async function cmdVideo(flags) {
     // 可拍摄包：SRT 字幕 + 分镜 CSV（零配置也能用，直接丢进剪映/人工拍摄）
     let shootFiles = null;
     try {
-      const dh = await import('../lib/digital-human.js');
-      const pkg = dh.exportShootPackage(script);
+      const pkgMod = await import('../lib/shoot-package.js');
+      const pkg = pkgMod.exportShootPackage(script);
       const srtFile = path.join(dir, `${contentId}.srt`);
       const csvFile = path.join(dir, `${contentId}-分镜.csv`);
       fs.writeFileSync(srtFile, pkg.srt, 'utf8');
@@ -2250,42 +2250,6 @@ async function cmdVideo(flags) {
       shootFiles = { srt: srtFile, csv: csvFile };
     } catch {
       shootFiles = null;
-    }
-
-    // 数字人渲染（需配置服务商；没配就明确说，不假装能出片）
-    let renderOutcome = null;
-    if (flags.render) {
-      let dh;
-      try {
-        dh = await import('../lib/digital-human.js');
-      } catch (error) {
-        throw new CliError('数字人模块不可用（lib/digital-human.js）', [`详情：${error?.message ?? error}`]);
-      }
-      const ready = dh.readiness(process.env);
-      if (!ready.ready) {
-        renderOutcome = { ok: false, reason: ready.reason };
-      } else {
-        const submitted = await dh.submitRender({ script, env: process.env, brand });
-        if (!submitted.ok) {
-          renderOutcome = { ok: false, reason: submitted.reason };
-        } else {
-          renderOutcome = { ok: true, jobId: submitted.jobId, provider: submitted.provider, status: 'submitted' };
-          const timeoutMs = intFlag(flags.wait, 'wait', 60000);
-          const deadline = Date.now() + Math.max(5000, timeoutMs);
-          while (Date.now() < deadline) {
-            await new Promise((resolve) => setTimeout(resolve, 8000));
-            const polled = await dh.pollRender({ jobId: submitted.jobId, env: process.env });
-            if (polled.ok && polled.url) {
-              renderOutcome = { ...renderOutcome, status: 'completed', url: polled.url };
-              break;
-            }
-            if (!polled.ok) {
-              renderOutcome = { ...renderOutcome, status: 'error', reason: polled.reason };
-              break;
-            }
-          }
-        }
-      }
     }
 
     if (flags.json) {
@@ -2298,16 +2262,6 @@ async function cmdVideo(flags) {
     if (shootFiles) {
       console.log(`可拍摄包：${shootFiles.srt}`);
       console.log(`            ${shootFiles.csv}`);
-    }
-    if (flags.render) {
-      if (renderOutcome?.ok && renderOutcome.url) {
-        console.log(`数字人视频已生成（${renderOutcome.provider}）：${renderOutcome.url}`);
-      } else if (renderOutcome?.ok) {
-        console.log(`数字人任务已提交：job=${renderOutcome.jobId}（还没出片，稍后用 --wait 更长时间重试）`);
-      } else {
-        console.log(`数字人未出片：${renderOutcome?.reason ?? '未配置'}`);
-        console.log('可先用可拍摄包：把 .srt 与分镜 CSV 导入剪映，或按脚本人工拍摄。');
-      }
     }
     return 0;
   });
