@@ -106,39 +106,117 @@ font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:320px;overflow:au
  * 页面外壳。
  * @param {{title:string, active:string, body:string, brandName?:string, right?:string}} options
  */
+/** 工作台分组：一级只保留 6 个模块，二级用标签页（对齐摘星/云罗/泓动的工作台结构） */
+export const NAV_GROUPS = Object.freeze([
+  {
+    id: 'home',
+    label: '工作台',
+    href: '/',
+    paths: ['/'],
+    tabs: [],
+  },
+  {
+    id: 'monitor',
+    label: '监测',
+    href: '/cockpit',
+    paths: ['/cockpit', '/responses', '/alerts', '/attribution', '/compare', '/insights', '/run-diagnose', '/run'],
+    tabs: [
+      ['/cockpit', '驾驶舱'],
+      ['/responses', '回答'],
+      ['/alerts', '异动'],
+      ['/attribution', '归因'],
+      ['/compare', '对位'],
+      ['/insights', '可见度'],
+      ['/run-diagnose', '跑诊断'],
+    ],
+  },
+  {
+    id: 'content',
+    label: '内容',
+    href: '/questions',
+    paths: ['/questions', '/tools', '/video', '/distribution', '/pipeline', '/weekly'],
+    tabs: [
+      ['/questions', '问题库'],
+      ['/tools', '工具箱'],
+      ['/video', '短视频'],
+      ['/distribution', '分发'],
+      ['/weekly', '周报'],
+      ['/pipeline', '验收'],
+    ],
+  },
+  {
+    id: 'client',
+    label: '客户',
+    href: '/clients',
+    paths: ['/clients', '/billing', '/agent'],
+    tabs: [
+      ['/clients', '客户与订阅'],
+      ['/billing', '结算'],
+      ['/agent', '代理'],
+    ],
+  },
+  {
+    id: 'compliance',
+    label: '合规',
+    href: '/facts',
+    paths: ['/facts', '/watch', '/audit-log'],
+    tabs: [
+      ['/facts', '事实库'],
+      ['/watch', '巡检'],
+      ['/audit-log', '审计日志'],
+    ],
+  },
+  {
+    id: 'setup',
+    label: '设置',
+    href: '/settings',
+    paths: ['/settings', '/doctor', '/audit', '/seo'],
+    tabs: [
+      ['/settings', '白标与配额'],
+      ['/doctor', '环境自检'],
+      ['/audit', '官网体检'],
+      ['/seo', 'SEO 体检'],
+    ],
+  },
+]);
+
+/** 根据当前路径找出所属分组与二级标签 */
+export function navStateOf(active = '') {
+  const path = String(active || '/');
+  const group =
+    NAV_GROUPS.find((item) => item.paths.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) ?? NAV_GROUPS[0];
+  const tabs = group.tabs.filter(([href]) => (NAV_POLICY.canAct || !ACTION_PATHS.has(href)));
+  return { group, tabs };
+}
+
 export function layout({ title, active = '', body = '', brandName = '', right = '' }) {
-  const items = [
-    ['/', '总览'],
-    ['/run-diagnose', '跑诊断'],
-    ['/cockpit', '语义份额驾驶舱'],
-    ['/responses', '回答浏览器'],
-    ['/facts', '事实库'],
-    ['/watch', '巡检'],
-    ['/alerts', '异动告警'],
-    ['/attribution', '内容归因'],
-    ['/compare', '竞品对位'],
-    ['/insights', '可见度分析'],
-    ['/tools', '工具箱'],
-    ['/distribution', '分发矩阵'],
-    ['/weekly', '周报'],
-    ['/agent', '代理总览'],
-    ['/pipeline', '闭环验收'],
-    ['/questions', '问题库'],
-    ['/audit', '官网体检'],
-    ['/seo', 'SEO 体检'],
-    ['/video', '短视频脚本'],
-    ['/doctor', '环境自检'],
-  ];
-  const nav = items
-    .filter(([href]) => (NAV_POLICY.canAct || !ACTION_PATHS.has(href)) && (href !== '/agent' || NAV_POLICY.role === 'agent'))
-    .map(([href, label]) => `<a href="${href}" class="${href === active ? 'on' : ''}">${esc(label)}</a>`)
+  const { group, tabs } = navStateOf(active);
+  const groups = NAV_GROUPS.filter((item) => {
+    if (item.id === 'client') return NAV_POLICY.role === 'admin' || NAV_POLICY.role === 'agent';
+    if (item.id === 'setup') return NAV_POLICY.role === 'admin';
+    if (item.id === 'compliance') return NAV_POLICY.role === 'admin' || NAV_POLICY.role === 'agent';
+    return true;
+  });
+  const nav = groups
+    .map((item) => `<a href="${item.href}" class="${item.id === group.id ? 'on' : ''}">${esc(item.label)}</a>`)
     .join('');
+  const tabBar = tabs.length > 1
+    ? `<div class="tabs">${tabs
+        .map(([href, label]) => `<a href="${href}" class="${href === active || active.startsWith(`${href}/`) ? 'on' : ''}">${esc(label)}</a>`)
+        .join('')}</div>`
+    : '';
+  const tabsStyle = `<style>.tabs{display:flex;gap:4px;padding:0 18px 8px;flex-wrap:wrap}
+.tabs a{font-size:12.5px;padding:5px 12px;border-radius:8px;color:var(--dim);border:1px solid transparent}
+.tabs a:hover{background:var(--panel);color:var(--ink)}
+.tabs a.on{background:rgba(124,92,255,.14);color:#b6a4ff;border-color:rgba(124,92,255,.35)}</style>`;
+
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · ${esc(THEME.title)}</title>
 <style>${CSS}
 :root{--accent:${THEME.color};--accent-dim:${THEME.color}33}
+${tabsStyle.replace('<style>', '').replace('</style>', '')}
 </style></head>
 <body>
 <div class="nav">
@@ -148,6 +226,7 @@ export function layout({ title, active = '', body = '', brandName = '', right = 
   <span class="sub">${esc(brandName || THEME.title)}</span>
   ${right ? `<span style="margin-left:10px">${right}</span>` : ''}
 </div>
+${tabBar}
 <div class="wrap">${body}</div>
 </body></html>`;
 }
@@ -213,7 +292,7 @@ export function dashboardPage({
          <div class="sub" style="margin-top:4px">还没有可用的评分</div></div>`;
 
   const body = `
-<h1>${esc(brand.name ?? '恒野')} · GEO 控制台</h1>
+<h1>${esc(brand.name ?? '恒野')} · GEO 工作台</h1>
 <div class="sub">${esc([brand.city, brand.scope, brand.industry].filter(Boolean).join(' · ') || '品牌信息待补充')}</div>
 
 ${subscription ? `<div class="hint" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;border-color:${subscription.expired ? '#ef4444' : subscription.mode === 'managed' ? '#22d3ee' : '#7c5cff'}">
@@ -223,6 +302,14 @@ ${subscription ? `<div class="hint" style="display:flex;gap:14px;flex-wrap:wrap;
   ${subscription.expired ? '<span class="badge bad">已到期，只读</span>' : ''}
   ${subscription.mode === 'managed' ? '<span class="sub">诊断由服务商代跑，你只需查看结果</span>' : ''}
 </div>` : ''}
+
+<h2>今天要做什么</h2>
+<div class="grid g4" style="margin-bottom:8px">
+  <a class="card" href="/run-diagnose" style="display:block"><div class="k">① 跑一轮诊断</div><div class="v" style="font-size:15px">看看 AI 现在怎么说</div><div class="sub">约 1–3 分钟 · mock 不花钱</div></a>
+  <a class="card" href="/alerts" style="display:block"><div class="k">② 看本周异动</div><div class="v" style="font-size:15px">掉了没有、涨了没有</div><div class="sub">对比上一轮</div></a>
+  <a class="card" href="/weekly" style="display:block"><div class="k">③ 出周报</div><div class="v" style="font-size:15px">给客户看的那份</div><div class="sub">可推送企微/邮件</div></a>
+  <a class="card" href="/facts" style="display:block"><div class="k">④ 登记关键事实</div><div class="v" style="font-size:15px">价格/资质/地址</div><div class="sub">没登记的内容不能写</div></a>
+</div>
 
 ${admin ? `<div class="hint" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
   <b>管理员</b>

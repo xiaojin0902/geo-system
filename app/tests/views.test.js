@@ -24,7 +24,10 @@ const brand = { name: '恒野', city: '芜湖', scope: '全国线上交付', ind
 test('layout：包含标题、导航高亮与品牌名', () => {
   const html = layout({ title: '总览', active: '/', body: '<p>正文</p>', brandName: '恒野' });
   assert.match(html, /<title>总览 · 恒野 GEO<\/title>/);
-  assert.match(html, /class="on">总览</);
+  // 导航已按工作台重构：一级是分组（工作台/监测/内容/客户/合规/设置）
+  assert.match(html, /class="on">工作台</);
+  assert.match(html, />监测</);
+  assert.match(html, />内容</);
   assert.match(html, /<p>正文<\/p>/);
   assert.match(html, /lang="zh-CN"/);
 });

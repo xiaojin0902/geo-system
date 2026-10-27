@@ -1105,6 +1105,20 @@ async function handle(req, res, slug, auth = null) {
     return html(res, 200, watchPage({ brand: state.brand, config, history, generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }));
   }
 
+  // ---------------------------------------------------------- 一级模块跳转（工作台分组）
+  const HUB_REDIRECTS = {
+    '/monitor': '/cockpit',
+    '/content': '/questions',
+    '/compliance': '/facts',
+    '/setup': '/settings',
+    '/client': '/clients',
+  };
+  if (req.method === 'GET' && HUB_REDIRECTS[pathname]) {
+    res.writeHead(302, { location: HUB_REDIRECTS[pathname] });
+    res.end();
+    return;
+  }
+
   // ---------------------------------------------------------- 事实库
   if (req.method === 'GET' && pathname === '/facts') {
     const state = collectState(slug);
