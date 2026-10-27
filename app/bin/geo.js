@@ -42,6 +42,7 @@ ${systemEdition()} · 命令行（node bin/geo.js）
   client     开通/续费客户订阅（自助版 / 托管版）
   agent      代理管理：开通代理、分配客户、查看分成
   bill       托管结算单：按效果计量（新增提及/引用/提及率/推荐次数）
+  case       每天一个 GEO 案例：输入行业，产出短视频/图文内容包 + 30 天选题日历
   media      信源库：23 个渠道的类型/成本/发布方式（可筛选与估算）
   watch      7×24 巡检：配置频率、立即巡检、查看历史、生成调度配置
   apikey     开放 API 密钥：创建/查看/吊销（客户系统对接）
@@ -3280,6 +3281,66 @@ async function cmdMedia(flags) {
   return 0;
 }
 
+
+/** 每天一个 GEO 案例：生成内容包（含 SRT）+ 30 天选题日历。 */
+async function cmdCase(flags) {
+  let caseMod;
+  try {
+    caseMod = await import('../lib/case-series.js');
+  } catch (error) {
+    throw new CliError('案例模块不可用（lib/case-series.js）', [`详情：${error?.message ?? error}`]);
+  }
+
+  if (flags.plan) {
+    const days = intFlag(flags.plan, 'plan', 30);
+    const plan = caseMod.buildCasePlan({ days });
+    if (flags.json) {
+      console.log(JSON.stringify(plan, null, 2));
+      return 0;
+    }
+    console.log(`# ${days} 天选题日历`, '');
+    printTable(['天', '日期', '行业', '标题'], plan.map((item) => [String(item.day), item.date, item.industry, item.title]));
+    console.log('');
+    console.log('用法：每天跑 node bin/geo.js case --industry <行业> --save，20 分钟出片。');
+    return 0;
+  }
+
+  const industry = stringFlag(flags.industry, 'industry') ?? '家政';
+  const caseStudy = caseMod.buildCaseStudy({ industry });
+  const markdown = caseMod.renderCaseMarkdown(caseStudy);
+
+  // 顺手产出 SRT + 分镜 CSV（复用可拍摄包）
+  let files = null;
+  try {
+    const shootMod = await import('../lib/shoot-package.js');
+    const pkg = shootMod.exportShootPackage({ title: caseStudy.title, narration: caseStudy.narration, shots: caseStudy.shots, hashtags: caseStudy.hashtags });
+    const dir = path.join(DATA_DIR, 'cases');
+    fs.mkdirSync(dir, { recursive: true });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const base = path.join(dir, `${stamp}-${industry}`);
+    fs.writeFileSync(`${base}.md`, markdown, 'utf8');
+    fs.writeFileSync(`${base}.srt`, pkg.srt, 'utf8');
+    fs.writeFileSync(`${base}-分镜.csv`, pkg.csv, 'utf8');
+    files = { md: `${base}.md`, srt: `${base}.srt`, csv: `${base}-分镜.csv` };
+  } catch {
+    files = null;
+  }
+
+  if (flags.json) {
+    console.log(JSON.stringify({ case: caseStudy, files }, null, 2));
+    return 0;
+  }
+  console.log(markdown);
+  if (files) {
+    console.log('');
+    console.log(`已保存：${files.md}`);
+    console.log(`        ${files.srt}`);
+    console.log(`        ${files.csv}`);
+    console.log('下一步：把 SRT 与分镜 CSV 导入剪映，或直接按口播稿拍摄。');
+  }
+  return 0;
+}
+
 // ---------------------------------------------------- doctor / audit / serve
 // 这三个命令解决的是「装完之后怎么用起来」，不是采集主链路，因此单独成段。
 
@@ -3455,6 +3516,7 @@ const HANDLERS = {
   client: cmdClient,
   agent: cmdAgent,
   bill: cmdBill,
+  case: cmdCase,
   media: cmdMedia,
   watch: cmdWatch,
   apikey: cmdApiKey,
