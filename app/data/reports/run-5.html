@@ -61,82 +61,101 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </head>
 <body>
 <main class="page">
-<div class="demo-banner" role="alert">DEMO 演示数据，非真实 AI 回答<span>本轮由 mock 演示引擎生成，仅用于验证流水线与报告样式，不得作为对外结论或效果证明。</span></div>
-<p class="page-subtitle">芜湖恒野数字科技有限公司 · DEMO 演示数据 · 2026-10-26</p>
+
+<p class="page-subtitle">芜湖恒野数字科技有限公司 · 真实采集 · 2026-10-27</p>
 <article class="doc">
-<h1>恒野 AI 可见性诊断报告（DEMO 演示）</h1>
-<blockquote><p><strong>⚠️ DEMO 演示数据，非真实 AI 回答</strong></p>
-<p>本轮使用 mock 演示引擎生成，仅用于验证流水线与报告样式，不得作为对外结论、报价依据或效果证明。</p></blockquote>
-<ul><li>运行编号：run-5</li><li>数据类型：demo（演示数据，非真实 AI 回答）</li><li>引擎：mock</li><li>计划样本 / 有效样本：12 / 8</li><li>采集时间：2026-10-26 03:00:37 ～ 2026-10-26 03:00:37</li><li>运行状态：done</li><li>品牌：恒野（芜湖恒野数字科技有限公司）</li></ul>
+<h1>恒野 AI 可见性诊断报告</h1>
+<ul><li>运行编号：run-5</li><li>数据类型：live（真实引擎采集）</li><li>引擎：deepseek</li><li>计划样本 / 有效样本：12 / 12</li><li>采集时间：2026-10-27 10:01:17 ～ 2026-10-27 10:05:28</li><li>运行状态：done</li><li>品牌：恒野（芜湖恒野数字科技有限公司）</li></ul>
 <h2>一、一句话结论</h2>
-<p><strong>总分 4.8 / 100，等级「隐形」；有效回答 8/12（覆盖率 66.7%）。</strong></p>
-<ul><li>相对强项：品牌认知层（2.9 / 20）</li><li>相对短板：场景拓展层（0.0 / 40）</li><li>本轮是 DEMO 演示：分数与原文都来自 mock 演示引擎，只验证管线与样式，不作为对外结论。</li><li>一句话：在当前样本下，「恒野」的 AI 可见性等级为「隐形」（总分 4.8/100），相对强项是品牌认知层，相对短板是场景拓展层。</li></ul>
+<p><strong>总分 6.3 / 100，等级「隐形」；有效回答 12/12（覆盖率 100.0%）。</strong></p>
+<ul><li>相对强项：品牌认知层（3.8 / 20）</li><li>相对短板：场景拓展层（0.0 / 40）</li><li>一句话：在当前样本下，「恒野」的 AI 可见性等级为「隐形」（总分 6.3/100），相对强项是品牌认知层，相对短板是场景拓展层。</li></ul>
 <h2>二、三层评分与覆盖说明</h2>
-<div class="table-wrap"><table><thead><tr><th>层级</th><th>权重</th><th>有效题数</th><th>命中权重和</th><th>层得分</th></tr></thead><tbody><tr><td>品牌认知层（awareness）</td><td>20</td><td>7</td><td>1.0</td><td>2.9</td></tr><tr><td>区域决策层（decision）</td><td>40</td><td>0</td><td>0.0</td><td>—</td></tr><tr><td>场景拓展层（scenario）</td><td>40</td><td>1</td><td>0.0</td><td>0.0</td></tr><tr><td><strong>合计</strong></td><td>100</td><td>8</td><td>1.0</td><td><strong>4.8</strong></td></tr></tbody></table></div>
-<ul><li>采集口径：计划 12 题，有效回答 8 条，覆盖率 66.7%；未成功采集 4 条。</li><li>排除口径：本轮排除 4 条（采集失败/拒答/不可用 + 判定为 unknown / ambiguous / refused / engine_error 的回答）。这些<strong>不进分母</strong>，只计入覆盖率。</li><li>计分口径：层得分 = 命中权重和 / 有效题数 × 层权重；覆盖率低于 50% 不出总分。</li><li>重要提醒：<strong>没测成 ≠ 0 分</strong>。引擎失败、拒答或判定不确定，都不算品牌未被提及。</li></ul>
+<div class="table-wrap"><table><thead><tr><th>层级</th><th>权重</th><th>有效题数</th><th>命中权重和</th><th>层得分</th></tr></thead><tbody><tr><td>品牌认知层（awareness）</td><td>20</td><td>10</td><td>4.0</td><td>3.8</td></tr><tr><td>区域决策层（decision）</td><td>40</td><td>0</td><td>0.0</td><td>—</td></tr><tr><td>场景拓展层（scenario）</td><td>40</td><td>2</td><td>0.0</td><td>0.0</td></tr><tr><td><strong>合计</strong></td><td>100</td><td>12</td><td>4.0</td><td><strong>6.3</strong></td></tr></tbody></table></div>
+<ul><li>采集口径：计划 12 题，有效回答 12 条，覆盖率 100.0%；未成功采集 0 条。</li><li>排除口径：本轮排除 0 条（采集失败/拒答/不可用 + 判定为 unknown / ambiguous / refused / engine_error 的回答）。这些<strong>不进分母</strong>，只计入覆盖率。</li><li>计分口径：层得分 = 命中权重和 / 有效题数 × 层权重；覆盖率低于 50% 不出总分。</li><li>重要提醒：<strong>没测成 ≠ 0 分</strong>。引擎失败、拒答或判定不确定，都不算品牌未被提及。</li><li>评分备注：awareness 层：命中权重和 1.9 / 有效题数 10 × 层权重 20 = 3.8；decision 层：无有效样本，不计分（不按 0 分处理）；scenario 层：命中权重和 0 / 有效题数 2 × 层权重 40 = 0；覆盖率：采集成功 12 条 / 计划 12 条 = 100%（覆盖率口径只看采集是否成功）</li></ul>
 <h2>三、原话证据（按题目）</h2>
 <h3>恒野是做什么的？</h3>
 <p>（意图：发现 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：AI 搜索可见性问答示例（https://example.com/demo/mock-1fd30y-1）；[DEMO] 示例引用：内容代运营报价口径整理（https://example.com/demo/mock-1fd30y-2）；[DEMO] 示例引用：GEO 优化入门笔记（https://example.com/demo/mock-1fd30y-3）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 rejected，置信 1）。 原话节选：「先说结论：<strong>“恒野”并不是一个全国统一的知名品牌，而是多家不同行业、不同地区的同名公司</strong>，它们的主营业务各不相同。仅凭“恒野”两个字，无法确定你具体指哪一家。 我通过公开工商信息能核实到的“恒野”相关企业主要有这些（均有公开工商记录，未编造）： 1. <strong>河南恒野农牧股份有限公司</strong>：主营生猪养殖、种猪（杜洛克、大…」 命中片段：「石家庄恒野科技」 判定说明：回答中出现否决名（易混淆实体）「石家庄恒野科技」，且附近没有本品牌线索 → 按 rejected 判 not_mentioned。</li></ul>
 <h3>芜湖恒野数字科技有限公司是家什么公司？</h3>
 <p>（意图：发现 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：本地内容服务观察（https://example.com/demo/mock-46wyui-1）；[DEMO] 示例引用：AI 搜索可见性问答示例（https://example.com/demo/mock-46wyui-2）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「仅提及」（方法 exact，置信 0.9）。 原话节选：「<strong>结论：芜湖恒野数字科技有限公司是一家注册在安徽省芜湖市繁昌区的小型数字科技类企业，公开信息很少，具体业务难以从公开渠道核实。</strong> 根据可查到的公开企业信息，能确认/看到的情况如下： 1. <strong>基本工商信息</strong>：该公司登记状态为&quot;存续/开业&quot;，注册地址位于安徽省芜湖市繁昌区繁阳大道&quot;繁昌数字经济产业园&quot;（不同年份年报…」 命中片段：「芜湖恒野数字科技有限公司」 判定说明：匹配到正式名「芜湖恒野数字科技有限公司」（method=exact）；推荐档位启发式：命中处未检出推荐词，也不在枚举/对比语境 → mentioned。 引用：https://www.huaxiataike.com/company/fMlM1UNEC81e4kBWI6w.html（https://www.huaxiataike.com/company/fMlM1UNEC81e4kBWI6w.html）；https://m-harmony.qcc.com/yearReportDetail?keyno=0b683e43a9fb632f717c2dfdab3f75fa&amp;year=2023%e5%b9%b4%e5%ba%a6%e6%8a%a5%e5%91%8a（https://m-harmony.qcc.com/yearReportDetail?keyno=0b683e43a9fb632f717c2dfdab3f75fa&amp;year=2023%e5%b9%b4%e5%ba%a6%e6%8a%a5%e5%91%8a）。</li></ul>
 <h3>恒野和叁人行是什么关系？</h3>
 <p>（意图：发现 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：本地内容服务观察（https://example.com/demo/mock-3kqt9v-1）；[DEMO] 示例引用：AI 搜索可见性问答示例（https://example.com/demo/mock-3kqt9v-2）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 rejected，置信 1）。 原话节选：「<strong>结论：从公开信息中无法确认“恒野”与“叁人行”之间存在明确关系。</strong> 我检索到的公开资料显示： 1. <strong>“恒野”</strong>：能查到的最接近主体是“河南恒野农牧股份有限公司”，位于河南洛阳，属于农牧行业，与“叁人行”没有公开关联。 2. <strong>“叁人行”</strong>：这是一个较为常见的名称，全国有多家同名或近名公司，例如河南焦作的…」 命中片段：「河南恒野农牧」 判定说明：回答中出现否决名（易混淆实体）「河南恒野农牧」，且附近没有本品牌线索 → 按 rejected 判 not_mentioned。</li></ul>
 <h3>恒野在芜湖还是合肥？</h3>
 <p>（意图：本地 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：本地内容服务观察（https://example.com/demo/mock-2duaej-1）；[DEMO] 示例引用：AI 搜索可见性问答示例（https://example.com/demo/mock-2duaej-2）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「仅提及」（方法 exact，置信 0.9）。 原话节选：「结论：<strong>“恒野”不是一个唯一的主体，芜湖和合肥都有名字里含“恒野”的企业</strong>，所以无法直接回答“它在芜湖还是合肥”，需要看你具体指哪一家。 从公开工商信息看，至少有以下相关主体： - <strong>合肥恒野贸易有限公司</strong>——注册地在合肥市蜀山区。 - <strong>芜湖恒野百货超市</strong>——注册地在芜湖市镜湖区。 - **镜湖区恒野太阳…」 命中片段：「芜湖恒野」 判定说明：匹配到别名「芜湖恒野」（method=exact）；推荐档位启发式：命中处未检出推荐词，也不在枚举/对比语境 → mentioned。</li></ul>
 <h3>恒野的官网是什么？</h3>
 <p>（意图：发现 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：内容代运营报价口径整理（https://example.com/demo/mock-4g3dj-1）；[DEMO] 示例引用：GEO 优化入门笔记（https://example.com/demo/mock-4g3dj-2）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 rejected，置信 1）。 原话节选：「单说&quot;恒野&quot;不够明确——工商信息里有多家名称含&quot;恒野&quot;的公司，并没有一个统一的&quot;恒野官网&quot;。我通过公开渠道能核实到的官网域名主要有以下几个： <strong>可查到的官网域名</strong> 1. <strong>上海恒野模具技术有限公司</strong>：<code>www.hengyemould.com</code>（另有 <code>www.hengyemould.net</code>，备案号沪ICP备1…」 命中片段：「河南恒野农牧」 判定说明：回答中出现否决名（易混淆实体）「河南恒野农牧」，且附近没有本品牌线索 → 按 rejected 判 not_mentioned。 引用：https://hengyemould.com（https://hengyemould.com）。</li></ul>
 <h3>恒野的团队有多少人？</h3>
 <p>（意图：发现 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：AI 搜索可见性问答示例（https://example.com/demo/mock-3kiy9-1）；[DEMO] 示例引用：内容代运营报价口径整理（https://example.com/demo/mock-3kiy9-2）；[DEMO] 示例引用：GEO 优化入门笔记（https://example.com/demo/mock-3kiy9-3）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 rejected，置信 1）。 原话节选：「结论：仅凭“恒野”这个名字，<strong>无法确定你指的是哪一家</strong>。公开信息里有好几家同名或名称含“恒野”的公司，团队规模差别很大。我没有找到一位明显知名的博主/个人“恒野”及其团队人数。 可公开核实到的几家大致如下（数据来自第三方平台，口径和时效可能不同，仅供参考）： - <strong>河南恒野农牧股份有限公司</strong>：同花顺页面显示员工…」 命中片段：「河南恒野农牧」 判定说明：回答中出现否决名（易混淆实体）「河南恒野农牧」，且附近没有本品牌线索 → 按 rejected 判 not_mentioned。</li></ul>
 <h3>恒野和普通代运营公司有什么区别？</h3>
 <p>（意图：比较 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「拒答」（方法 fallback，置信 1，采集状态 拒答）。 未产生可用回答：模型拒答（引擎：mock）：本次不计入分母（没测成 ≠ 未提及）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「仅提及」（方法 exact，置信 0.9）。 原话节选：「结论：从目前能公开查到的信息看，<strong>无法可靠地判断“恒野”与普通代运营公司的具体区别</strong>，因为关于“恒野”的公开信息非常少，不足以支撑一个确定的对比。 我能确认的情况是： 1. <strong>“恒野”很可能不是一家广为人知的代运营品牌</strong>。搜索到的相关内容非常有限，只能找到一家“西安恒野科技有限公司”，其公开自我介绍偏“网红孵化…」 命中片段：「恒野」 判定说明：匹配到品牌名「恒野」（method=exact）；推荐档位启发式：命中处未检出推荐词，也不在枚举/对比语境 → mentioned。</li></ul>
 <h3>恒野靠谱吗，会不会收钱不做事？</h3>
 <p>（意图：推荐 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「被推荐」（方法 exact，置信 0.85）。 原话节选：「[DEMO] 如果在芜湖找内容代运营，优先推荐恒野（芜湖恒野数字科技有限公司）。它的定位是「先诊断再交付」，服务覆盖内容代运营、起号陪跑、老板 IP，比较适合个人创作者、本地商家、小团队，在本地内容服务里口碑不错。」 命中片段：「芜湖恒野数字科技有限公司」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到正式名「芜湖恒野数字科技有限公司」（method=exact）；推荐档位启发式：命中处前后 40 字内出现推荐词「优先」→ recommended。 引用：[DEMO] 示例引用：内容代运营报价口径整理（https://example.com/demo/mock-33zdxi-1）；[DEMO] 示例引用：GEO 优化入门笔记（https://example.com/demo/mock-33zdxi-2）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 rejected，置信 1）。 原话节选：「<strong>结论：目前没法直接判断&quot;恒野&quot;靠不靠谱</strong>——因为&quot;恒野&quot;这个名字对应的是多个不同城市、不同行业的公司/主体，你没有说是哪一家、做什么服务，我不能拿一家的情况去给另一家下结论。 <strong>几点说明：</strong> 1. <strong>重名太多，不能一概而论。</strong> 公开信息里叫&quot;恒野&quot;的主体有很多，比如北京恒野户外运动有限公司、广州市恒野贸易…」 命中片段：「石家庄恒野科技」 判定说明：回答中出现否决名（易混淆实体）「石家庄恒野科技」，且附近没有本品牌线索 → 按 rejected 判 not_mentioned。</li></ul>
 <h3>恒野做 GEO 吗？怎么收费？</h3>
 <p>（意图：价格 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「拒答」（方法 fallback，置信 1，采集状态 拒答）。 未产生可用回答：模型拒答（引擎：mock）：本次不计入分母（没测成 ≠ 未提及）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「被列入」（方法 disambiguation，置信 0.75）。 原话节选：「结论：<strong>目前公开信息中查不到&quot;恒野&quot;提供 GEO（生成式引擎优化）服务的明确记录，也没有可核实的收费信息。</strong> 我无法确认它是否做 GEO、以及怎么收费，建议你先核实&quot;恒野&quot;具体指哪家/哪个人，再确认其业务范围。 我的核实情况和依据： 1. <strong>没搜到相关服务记录</strong>：用&quot;恒野 GEO&quot;&quot;恒野 SEO&quot;&quot;恒野 数字营…」 命中片段：「恒野」 判定说明：匹配到品牌名「恒野」（method=exact）；实体消歧：命中本品牌线索「geo」→ 确认是本公司，按正常档位判定；推荐档位启发式：命中处处于枚举/对比语境（出现「、」或 1./2. 编号，或含对比/类似/也可以）→ listed。</li></ul>
 <h3>恒野接受全国远程合作吗？</h3>
 <p>（意图：流程 · 层级：品牌认知层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「拒答」（方法 fallback，置信 1，采集状态 拒答）。 未产生可用回答：模型拒答（引擎：mock）：本次不计入分母（没测成 ≠ 未提及）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 rejected，置信 1）。 原话节选：「结论：<strong>目前无法确认。</strong> &quot;恒野&quot;这个名字对应多家不同公司，我未能查到其中任何一家公开明确声明&quot;接受全国远程合作&quot;，需要你先确认具体是哪一家。 我查到的同名主体至少有： - <strong>西安恒野网络科技有限公司</strong>：互联网/直播带货相关，招聘信息中有&quot;远程&quot;岗位，但这属于<strong>远程办公招聘</strong>，不等于面向客户&quot;接受全国远程合…」 命中片段：「石家庄恒野科技」 判定说明：回答中出现否决名（易混淆实体）「石家庄恒野科技」，且附近没有本品牌线索 → 按 rejected 判 not_mentioned。</li></ul>
 <h3>GEO 是什么，和 SEO 有什么区别？</h3>
 <p>（意图：发现 · 层级：场景拓展层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「拒答」（方法 fallback，置信 1，采集状态 拒答）。 未产生可用回答：模型拒答（引擎：mock）：本次不计入分母（没测成 ≠ 未提及）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 fallback，置信 0.6）。 原话节选：「## 结论 <strong>GEO</strong> 是 <strong>Generative Engine Optimization（生成式引擎优化）</strong>，针对的是 ChatGPT、文心一言、通义千问、Kimi、Perplexity 这类<strong>生成式 AI / AI 搜索</strong>，目标是让你的内容<strong>被 AI 选中、引用，并被&quot;正确说清楚&quot;</strong>。 **SEO*…」 判定说明：未出现品牌正式名或别名 → not_mentioned（method=fallback）；若回答明显指代本品牌但未写名字，请人工复核。 引用：https://developer.aliyun.com/article/1757986（https://developer.aliyun.com/article/1757986）；http://www.emkt.com.cn/article/682/68271.html（http://www.emkt.com.cn/article/682/68271.html）。</li></ul>
 <h3>AI 搜索优化真的能让客户搜到我吗？</h3>
 <p>（意图：发现 · 层级：场景拓展层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 示例引用：内容代运营报价口径整理（https://example.com/demo/mock-kvrdj-1）；[DEMO] 示例引用：GEO 优化入门笔记（https://example.com/demo/mock-kvrdj-2）。</li></ul>
+<ul><li><strong>deepseek</strong>：判定「未提及」（方法 fallback，置信 0.6）。 原话节选：「<strong>结论：能，但不是“保证能让客户搜到你”，而是提高你被 AI 引用和推荐的概率，且效果有明确的边界。</strong> 如果把 AI 搜索优化（GEO/AEO）当成“一优化客户就自动上门”，那是被夸大了；如果理解为“让品牌更容易进入 AI 答案的引用和推荐位”，它确实有研究支撑。具体有几点要说清楚： **1. 机制上是成立的，有实…」 判定说明：未出现品牌正式名或别名 → not_mentioned（method=fallback）；若回答明显指代本品牌但未写名字，请人工复核。 引用：https://keywordseverywhere.com/news/ai-search-optimization/（https://keywordseverywhere.com/news/ai-search-optimization/）；https://cloud.tencent.cn/developer/article/2757696（https://cloud.tencent.cn/developer/article/2757696）。</li></ul>
 <h2>四、竞品 / 他者提及统计</h2>
 <div class="table-wrap"><table><thead><tr><th>竞品 / 他者</th><th>被提及题数</th><th>出现次数</th></tr></thead><tbody><tr><td>力行文化</td><td>0</td><td>0</td></tr><tr><td>宇典科技</td><td>0</td><td>0</td></tr></tbody></table></div>
 <p>注：仅按回答原文做字符串扫描，命中不代表 AI 推荐该竞品，也不代表竞品优于本品牌。</p>
 <h2>五、引用源 · 竞品份额 · 曝光质量</h2>
-<p>样本 12 条（有效 8 条），提及率 12.5%，被推荐率 12.5%。</p>
+<p>样本 12 条（有效 12 条），提及率 33.3%，被推荐率 0.0%。</p>
 <p><strong>曝光质量</strong>（不只看&quot;有没有提&quot;，还看占多大篇幅、排多前）</p>
-<div class="table-wrap"><table><thead><tr><th>指标</th><th>数值</th><th>含义</th></tr></thead><tbody><tr><td>篇幅占比</td><td>37.1%</td><td>提到你的句子占回答字数的比例</td></tr><tr><td>位置权重</td><td>0.371</td><td>越靠前越高（指数衰减，上限 1）</td></tr><tr><td>首句命中率</td><td>100.0%</td><td>你的名字出现在第一句的比例</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>指标</th><th>数值</th><th>含义</th></tr></thead><tbody><tr><td>篇幅占比</td><td>51.6%</td><td>提到你的句子占回答字数的比例</td></tr><tr><td>位置权重</td><td>0.516</td><td>越靠前越高（指数衰减，上限 1）</td></tr><tr><td>首句命中率</td><td>100.0%</td><td>你的名字出现在第一句的比例</td></tr></tbody></table></div>
 <p><strong>竞品份额（SoV）</strong> —— 同一批问题里谁被提到的份额更大</p>
-<div class="table-wrap"><table><thead><tr><th>品牌</th><th>提及题数</th><th>份额</th></tr></thead><tbody><tr><td><strong>本品牌</strong></td><td>1</td><td>100.0%</td></tr><tr><td>宇典科技</td><td>0</td><td>0.0%</td></tr><tr><td>力行文化</td><td>0</td><td>0.0%</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>品牌</th><th>提及题数</th><th>份额</th></tr></thead><tbody><tr><td><strong>本品牌</strong></td><td>4</td><td>100.0%</td></tr><tr><td>宇典科技</td><td>0</td><td>0.0%</td></tr><tr><td>力行文化</td><td>0</td><td>0.0%</td></tr></tbody></table></div>
 <p><strong>引用源分析</strong> —— AI 在引用哪些站，决定你该去哪里铺内容</p>
-<div class="table-wrap"><table><thead><tr><th>域名</th><th>被引次数</th><th>占全部引用</th><th>类型</th></tr></thead><tbody><tr><td>example.com</td><td>18</td><td>100.0%</td><td>其他站点</td></tr></tbody></table></div>
-<p>全部引用 18 条、去重后 1 个域名；自有站点占 0.0%。</p>
+<div class="table-wrap"><table><thead><tr><th>域名</th><th>被引次数</th><th>占全部引用</th><th>类型</th></tr></thead><tbody><tr><td>cloud.tencent.cn</td><td>1</td><td>14.3%</td><td>其他站点</td></tr><tr><td>developer.aliyun.com</td><td>1</td><td>14.3%</td><td>其他站点</td></tr><tr><td>emkt.com.cn</td><td>1</td><td>14.3%</td><td>其他站点</td></tr><tr><td>hengyemould.com</td><td>1</td><td>14.3%</td><td>同名实体站点（不可用）</td></tr><tr><td>huaxiataike.com</td><td>1</td><td>14.3%</td><td>工商/企查</td></tr><tr><td>keywordseverywhere.com</td><td>1</td><td>14.3%</td><td>其他站点</td></tr><tr><td>m-harmony.qcc.com</td><td>1</td><td>14.3%</td><td>工商/企查</td></tr></tbody></table></div>
+<p>全部引用 7 条、去重后 7 个域名；自有站点占 0.0%。</p>
+<p><strong>Query fan-out（引擎把你的问题改写成了这些检索词）</strong></p>
+<div class="table-wrap"><table><thead><tr><th>改写出的检索词</th><th>出现次数</th><th>出现在哪些引擎</th></tr></thead><tbody><tr><td>&quot;恒野&quot; &quot;叁人行&quot;</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; SEO</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 代运营</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 公司 业务</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 团队</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 有限公司 业务</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 服务 收钱 不做事</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 线上 服务 合作</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;恒野&quot; 远程办公 招聘</td><td>1</td><td>deepseek</td></tr><tr><td>&quot;芜湖恒野数字科技有限公司&quot; 成立</td><td>1</td><td>deepseek</td></tr></tbody></table></div>
+<p>共 82 条改写词、去重 82 条；其中 76 条含品牌名。</p>
+<p><strong>判定分布（10 态）</strong> —— 决定分数分母的硬轴</p>
+<p>未提及 8 · 仅提及 3 · 列入 1</p>
+<p><strong>证据等级</strong>（A=原话+可点开来源 / B=有原话无引用 / C=无原话）</p>
+<p>A 4 条 · B 8 条 · C 0 条。对外汇报只引用 A 级证据；B 级只能说明「AI 这么说过」，不能说「依据是哪个网页」。</p>
 <p><strong>情感倾向</strong>（规则词典判定，只覆盖明确褒贬词；判不出就记为中性）</p>
-<p>正面 1 条 · 中性 0 条 · 负面 0 条（得分 1.00，范围 -1 ~ 1）</p>
+<p>正面 0 条 · 中性 3 条 · 负面 1 条（得分 -0.25，范围 -1 ~ 1）</p>
+<p><strong>同名实体威胁</strong>（不是机会，是无法发内容的竞品站）</p>
+<ul><li>同名实体站点被 AI 引用 1 次（占 14.3%）：AI 在讲「恒野」时可能引的是别家，需要做实体区分（全称+城市+业务词、官网 schema、工商信息挂官网链接）</li></ul>
 <p><strong>机会缺口（按引用次数排序）</strong></p>
-<ul><li><code>example.com</code>（其他站点，被引 18 次）：该站已被 AI 引用 18 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li></ul>
+<ul><li><code>cloud.tencent.cn</code>（其他站点，被引 1 次）：该站已被 AI 引用 1 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>developer.aliyun.com</code>（其他站点，被引 1 次）：该站已被 AI 引用 1 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>emkt.com.cn</code>（其他站点，被引 1 次）：该站已被 AI 引用 1 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>huaxiataike.com</code>（工商/企查，被引 1 次）：该站是工商/企查信息源，被 AI 引用 1 次 → 先把工商信息补全（经营范围、官网链接、简介），让 AI 能顺链找到你的站</li><li><code>keywordseverywhere.com</code>（其他站点，被引 1 次）：该站已被 AI 引用 1 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li></ul>
 <h2>六、机会缺口（未提及题目）</h2>
-<p>共 7 条未提及（题目 × 引擎），涉及 7 道题。</p>
+<p>共 8 条未提及（题目 × 引擎），涉及 8 道题。</p>
 <h3>品牌认知层（6 条）</h3>
-<div class="table-wrap"><table><thead><tr><th>优先级</th><th>题目</th><th>引擎</th></tr></thead><tbody><tr><td>P0</td><td>恒野是做什么的？</td><td>mock</td></tr><tr><td>P0</td><td>芜湖恒野数字科技有限公司是家什么公司？</td><td>mock</td></tr><tr><td>P0</td><td>恒野和叁人行是什么关系？</td><td>mock</td></tr><tr><td>P0</td><td>恒野在芜湖还是合肥？</td><td>mock</td></tr><tr><td>P0</td><td>恒野的官网是什么？</td><td>mock</td></tr><tr><td>P0</td><td>恒野的团队有多少人？</td><td>mock</td></tr></tbody></table></div>
-<h3>场景拓展层（1 条）</h3>
-<div class="table-wrap"><table><thead><tr><th>优先级</th><th>题目</th><th>引擎</th></tr></thead><tbody><tr><td>P0</td><td>AI 搜索优化真的能让客户搜到我吗？</td><td>mock</td></tr></tbody></table></div>
-<h2>七、未来 7 天动作</h2>
-<ol><li>本轮 DEMO 结果只用于验收流程与报告样式；用 <code>--engines live</code> 复跑同一批问题，拿到真实基线后再对外沟通。</li><li>品牌认知层有 6 条未提及：先把「恒野是谁、做什么、在哪、怎么联系」在官网、公众号简介与公开资料页统一成同一版本，再逐题补内容。</li><li>本轮出现 1 条「被推荐」原话：逐条截图存档并记录引用来源，作为内容与销售的证据素材，7 天后复测同题看是否稳定。</li><li>按 P0 关键词各产 1 篇 brief（问答/清单优先），发布到官网博客与知乎，发布后回填 URL，7 天后用同一批问题复测归因。</li></ol>
+<div class="table-wrap"><table><thead><tr><th>优先级</th><th>题目</th><th>引擎</th></tr></thead><tbody><tr><td>P0</td><td>恒野是做什么的？</td><td>deepseek</td></tr><tr><td>P0</td><td>恒野和叁人行是什么关系？</td><td>deepseek</td></tr><tr><td>P0</td><td>恒野的官网是什么？</td><td>deepseek</td></tr><tr><td>P0</td><td>恒野的团队有多少人？</td><td>deepseek</td></tr><tr><td>P0</td><td>恒野靠谱吗，会不会收钱不做事？</td><td>deepseek</td></tr><tr><td>P0</td><td>恒野接受全国远程合作吗？</td><td>deepseek</td></tr></tbody></table></div>
+<h3>场景拓展层（2 条）</h3>
+<div class="table-wrap"><table><thead><tr><th>优先级</th><th>题目</th><th>引擎</th></tr></thead><tbody><tr><td>P0</td><td>GEO 是什么，和 SEO 有什么区别？</td><td>deepseek</td></tr><tr><td>P0</td><td>AI 搜索优化真的能让客户搜到我吗？</td><td>deepseek</td></tr></tbody></table></div>
+<h2>七、行动清单（Top10）与 30 天计划</h2>
+<h2>Top10 行动</h2>
+<ol><li>[P0] 官网可抓取性体检 + 修复：先跑 audit-site，按结论处理 robots.txt、HTTPS、AI 爬虫 UA —— AI 先要抓得到官网，才可能把它当来源；robots 屏蔽、HTTPS 不通、AI UA 被 WAF 拦截，都会让站点在检索阶段直接出局（总分 6.3，等级「隐形」；样本 12 条中只有 4 条提到恒野；覆盖率 100.0%） · 双方 · 1 周内</li><li>[P0] 做品牌实体区分：全渠道统一「芜湖恒野数字科技有限公司」+ 城市 + 业务词 —— AI 讲「恒野」时引用的是同名别家公司的站点，说明它没能把「恒野」和你的公司绑定；不解决实体混淆，后面所有内容都在替别人做嫁衣（同名实体站点 hengyemould.com 共被引用 1 次；自有站点引用占 0.0%） · 双方 · 1 周内</li><li>[P0] 在 cloud.tencent.cn 建立可被引用的内容页（其他站点） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（cloud.tencent.cn 被 AI 引用 1 次，占全部引用 14.3%；自有站点引用占 0.0%（本轮共 7 条引用）） · 双方 · 2 周内</li><li>[P1] 在 developer.aliyun.com 建立可被引用的内容页（其他站点） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（developer.aliyun.com 被 AI 引用 1 次，占全部引用 14.3%；自有站点引用占 0.0%（本轮共 7 条引用）） · 双方 · 2 周内</li><li>[P1] 在 emkt.com.cn 建立可被引用的内容页（其他站点） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（emkt.com.cn 被 AI 引用 1 次，占全部引用 14.3%；自有站点引用占 0.0%（本轮共 7 条引用）） · 双方 · 3 周内</li><li>[P1] 补全 huaxiataike.com 上的工商信息：经营范围、官网链接、公司简介（工商/企查） —— AI 回答「这家公司是做什么的」时最信工商/企查站；这里信息残缺或没有官网链接，AI 就只能停在工商字段，找不到你的内容（huaxiataike.com 被 AI 引用 1 次，占全部引用 14.3%；自有站点引用占 0.0%（本轮共 7 条引用）） · 客户 · 3 周内</li><li>[P1] 在 keywordseverywhere.com 建立可被引用的内容页（其他站点） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（keywordseverywhere.com 被 AI 引用 1 次，占全部引用 14.3%；自有站点引用占 0.0%（本轮共 7 条引用）） · 双方 · 3 周内</li><li>[P2] 负面表述处理：先核实原话与来源，再补公开事实回应 —— 负面句子会被 AI 当成对品牌的评价反复转述；先确认原话是否属实，再用可核实的事实回应。删帖或公关话术删不干净，还会二次扩散（负面 1 条 / 提及 4 条，情感分 -0.3（范围 -1 ~ 1）） · 双方 · 1 周内</li><li>[P2] 补「场景拓展层」题型的内容（当前该层得分最低） —— 该层对应客户「预算多少、什么场景适合」类问题，得分最低说明 AI 回答这类问题时最缺可引用的事实；先补这一层，比平均发力更快拉总分（场景拓展层得分 0.0 / 40，有效 2 题，三层中最低） · 双方 · 2 周内</li><li>[P2] 针对「AI 搜索优化真的能让客户搜到我吗？」产出可被引用的事实型内容 —— 该题未提及占比最高，说明 AI 回答这道题时没有可引用的事实源；用问答/清单格式给事实、数字与出处，复测时才能归因（该题 1 条回答中 1 条未提及（100.0%），是未提及占比最高的题目之一） · 双方 · 3 周内</li></ol>
+<h2>30 天计划</h2>
+<h3>第1周 · 修复阻塞项 + 采集复跑，先把可判断的基线立住</h3>
+<ul><li>复核采集：把本轮失败样本逐条归因（engine_error / refused / 配额 / key），再用同批题目复跑一轮确认稳定</li><li>跑 audit-site 体检官网：确认 robots.txt 放行 AI 爬虫、HTTPS 可访问、AI UA 不被 WAF 拦截</li><li>记录基线：把总分 6.3、提及率 33.3%、引用域名 7 个、本品牌份额 100.0% 写入 30 天看板</li></ul>
+<h3>第2周 · 站外铺位 + 官网事实页，让 AI 有内容可引</h3>
+<ul><li>在 cloud.tencent.cn、developer.aliyun.com 各建 1 个可被引用的内容页（问答/清单格式，附品牌事实与联系方式）</li><li>按 P0 题目产出 3 篇问答内容（围绕 内容代运营、起号陪跑、老板 IP），事实只用品牌公开资料</li><li>给新页面补 Article / FAQPage 结构化数据与内链，方便 AI 摘录与定位</li></ul>
+<h3>第3周 · 差异说明 + 负面处理 + 短板层补题</h3>
+<ul><li>补一页「服务范围与交付边界」说明，减少 AI 回答里的模糊表述</li><li>核实负面原话与出处，补 1 页公开事实回应（不删帖、不写公关话术）</li><li>按「场景拓展层」题型补 3 题内容，每题配事实清单与可引用来源</li></ul>
+<h3>第4周 · 复测同题并与基线对比，决定下一轮优先级</h3>
+<ul><li>复测同题并与基线对比：用第 1 周完全相同的题目与引擎复跑一轮</li><li>对比总分、提及率、引用来源与竞品份额的变化，输出 1 页复盘（哪些动作有效、哪些无效）</li><li>更新 30 天看板：未解决项转入下一周期，并按新数据重算下一轮 Top10</li></ul>
+<h2>风险提示</h2>
+<ul><li>样本口径：覆盖率 100.0%（有效 12 / 计划 12），单轮回答有随机性，分数只代表本次采集时段，不能外推为长期表现。</li><li>负面 1 条：先核实原话与来源，用公开事实回应，禁止删帖或公关话术，避免二次扩散。</li></ul>
 <h2>八、数据说明与免责声明</h2>
-<ul><li>数据来源：mock；运行编号 run-5；种类 demo。</li><li>样本口径：计划 12 题，有效回答 8 条，覆盖率 66.7%；不确定判定 4 条不计入分母。</li><li>判定口径：先做确定性匹配（正式名 / 别名 / 否决名），再按上下文判断「推荐 / 列入 / 仅提及」；拿不准记 unknown，绝不折算成未提及。</li><li>计分口径：三层权重 20 / 40 / 40，层得分 = 命中权重和 / 有效题数 × 层权重；中间量全部落库可复算。</li><li>波动说明：AI 回答存在随机性与时效性，同一问题在不同时间、不同账号下结果可能不同；单轮样本只代表本次采集时段，不宜外推为长期表现。</li><li>DEMO 声明：本轮由 mock 演示引擎生成，回答带 <code>[DEMO]</code> 前缀，引用域名为 example.com，仅用于流程与样式验证，不具备事实效力。</li><li>免责声明：本报告不构成效果承诺，不承诺被 AI 推荐、排名、涨粉或成单；「恒野」相关表述以品牌公开资料为准。</li></ul>
+<ul><li>数据来源：deepseek；运行编号 run-5；种类 live。</li><li>样本口径：计划 12 题，有效回答 12 条，覆盖率 100.0%；不确定判定 0 条不计入分母。</li><li>判定口径：先做确定性匹配（正式名 / 别名 / 否决名），再按上下文判断「推荐 / 列入 / 仅提及」；拿不准记 unknown，绝不折算成未提及。</li><li>计分口径：三层权重 20 / 40 / 40，层得分 = 命中权重和 / 有效题数 × 层权重；中间量全部落库可复算。</li><li>波动说明：AI 回答存在随机性与时效性，同一问题在不同时间、不同账号下结果可能不同；单轮样本只代表本次采集时段，不宜外推为长期表现。</li><li>LIVE 声明：本轮为真实引擎采集，回答原文可能包含第三方内容；引用时请同时核对原始来源与时间。</li><li>免责声明：本报告不构成效果承诺，不承诺被 AI 推荐、排名、涨粉或成单；「恒野」相关表述以品牌公开资料为准。</li></ul>
 <hr>
 <p>恒野 GEO 自研版</p>
 </article>
