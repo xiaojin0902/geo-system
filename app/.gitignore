@@ -1,3 +1,5 @@
-data/
-node_modules/
 .env
+data/geo.db
+data/geo.db-*
+data/reports/
+data/contents/

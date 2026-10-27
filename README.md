@@ -1,41 +1,40 @@
-# 恒野 GEO 监测系统
+# GEO 代运营交付系统（v2）
 
-独立部署的 GEO（生成式引擎优化）监测系统，与官网完全分离。
+围绕「客户 → 月度交付周期 → 六步流程 → 交付物」重建，不再是功能大杂烩。
 
-**工作方式**：GitHub Actions 每天 07:12（北京时间）自动跑一轮 AI 可见度诊断 → 构建静态系统页面 → 部署到 GitHub Pages。
-不需要服务器，永久免费；历史报告按 run 归档。
+## 六步流程
 
-## 页面
+诊断 → 方案 → 内容 → 发布 → 复测 → 交付
 
-- `index.html` 总览：评分、提及率、自有引用占比、竞品份额、判定分布、引用源、fan-out、Top10 行动、30 天计划
-- `runs.html` 历史运行（点进去看每轮报告）
-- `report.html` 最新诊断报告
-- `systems.html` 引擎状态与全部计算口径
+## 页面（只有三个）
 
-## 配置真实引擎
-
-仓库 Settings → Secrets and variables → Actions，添加：
-
-| Secret | 用途 |
+| 页面 | 作用 |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | DeepSeek 联网检索（推荐，一次 12 题约 0.3 元） |
-| `DASHSCOPE_API_KEY` | 通义千问（百炼） |
-| `DOUBAO_API_KEY` + `DOUBAO_MODEL` | 豆包（方舟推理接入点 ID） |
-| `KIMI_API_KEY` | Kimi |
-| `YUANBAO_BASE_URL` + `YUANBAO_API_KEY` | 元宝（OpenAI 兼容中转） |
+| `/` 工作台 | 客户卡片 + 六步进度 + 今日待办 + 平均分 |
+| `/client/<slug>` 客户 | 单客户：指标、待办、内容、发布、交付物、动作按钮 |
+| `/settings` 设置 | 引擎状态、白标（系统名/主色） |
+| `/s/<token>` 分享 | 客户免登录看报告（30 天） |
 
-没配任何密钥时自动用演示引擎（数据带 DEMO 标记，不冒充真实）。
-
-## 本地运行
+## 命令（只有 7 个）
 
 ```bash
-cd app
-node bin/geo.js init --brand hengye
-node bin/geo.js diagnose --brand hengye --engines deepseek --limit 12
-node scripts/build-site.mjs --out ../dist-site
-cd .. && python3 -m http.server 8000 --directory dist-site
+node bin/geo.js init --slug demo --name 演示家政 --industry 家政 --city 芜湖 --competitors "同行A,同行B"
+node bin/geo.js diagnose --slug demo --engine mock --limit 5
+node bin/geo.js content --slug demo
+node bin/geo.js deliver --slug demo
+node bin/geo.js list
+node bin/geo.js report --slug demo
+node bin/geo.js serve
 ```
 
-## 注意
+## 口径（可复算）
 
-系统对搜索引擎封闭（`robots.txt` Disallow），只有拿到地址的人能访问；如需客户可见，把仓库设为 Private 并改用带访问控制的托管。
+- 判定 6 态：推荐 / 列入 / 仅提及 / 未提及 / 歧义 / 采集失败（歧义与失败不进分母）
+- 评分 0–100 = 提及 60 + 判定质量 25 + 引用多样性 15
+- 没有有效样本时不出分（没测成 ≠ 0 分）
+
+## 测试
+
+```bash
+node --test
+```
