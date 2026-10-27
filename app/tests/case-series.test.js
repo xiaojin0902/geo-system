@@ -87,3 +87,50 @@ test('确定性：同输入内容一致（除 generatedAt）', () => {
   const strip = (c) => ({ ...c, generatedAt: '' });
   assert.deepEqual(strip(a), strip(b));
 });
+
+// ---------------------------------------------------------------- v2 评分表
+
+test('评分表：完整案例拿满分且无待修项', async () => {
+  const { auditCaseStudy } = await import('../lib/case-series.js');
+  const c = buildCaseStudy({ industry: '家政' });
+  const sc = auditCaseStudy(c);
+  assert.equal(sc.score, 100);
+  assert.equal(sc.level, '优秀');
+  assert.deepEqual(sc.fixes, []);
+});
+
+test('评分表：缺 FAQ/来源/实体 会被扣分并给修复项', async () => {
+  const { auditCaseStudy } = await import('../lib/case-series.js');
+  const c = buildCaseStudy({ industry: '家政' });
+  const broken = { ...c, faq: [], sources: [], entityBlock: {} };
+  const sc = auditCaseStudy(broken);
+  assert.ok(sc.score < 85, `缺项后分数应下降，实际 ${sc.score}`);
+  assert.ok(sc.fixes.length >= 3);
+  assert.ok(sc.checks.some((check) => check.id === 'faq_block' && !check.ok));
+});
+
+test('评分表：绝对化用语直接判定不合规', async () => {
+  const { auditCaseStudy } = await import('../lib/case-series.js');
+  const c = buildCaseStudy({ industry: '家政' });
+  const hyped = { ...c, resultLine: '保证第一，100% 被推荐' };
+  const sc = auditCaseStudy(hyped);
+  assert.equal(sc.checks.find((check) => check.id === 'no_hype').ok, false);
+  assert.ok(sc.score < 100);
+});
+
+test('评分表：等级阈值', async () => {
+  const { auditCaseStudy } = await import('../lib/case-series.js');
+  const base = buildCaseStudy({ industry: '家政' });
+  const empty = auditCaseStudy({ title: 'x' });
+  assert.equal(empty.level, '不合格');
+  const half = auditCaseStudy({ ...base, faq: [], sources: [], schemaHints: [] });
+  assert.ok(['及格', '良好'].includes(half.level), `实际 ${half.level}`);
+});
+
+test('v2 内容包含可引用金句与实体块，供 AI 摘录', () => {
+  const c = buildCaseStudy({ industry: '口腔' });
+  assert.match(c.quote, /「.+」/);
+  assert.ok(c.entityBlock.legalName && c.entityBlock.city);
+  assert.ok(c.faq.length >= 3);
+  assert.ok(c.sources.length >= 2);
+});

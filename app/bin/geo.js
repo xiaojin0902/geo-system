@@ -3331,6 +3331,15 @@ async function cmdCase(flags) {
     return 0;
   }
   console.log(markdown);
+  const sc = caseStudy.scorecard;
+  if (sc) {
+    console.log('');
+    console.log(`评分表自检：${sc.score}/100（${sc.level}）· 通过 ${sc.passed}/${sc.total} 项`);
+    if ((sc.fixes ?? []).length) {
+      console.log('待修复：');
+      for (const fix of sc.fixes) console.log(`  - ${fix}`);
+    }
+  }
   if (files) {
     console.log('');
     console.log(`已保存：${files.md}`);
