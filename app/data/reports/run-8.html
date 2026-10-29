@@ -62,12 +62,12 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <body>
 <main class="page">
 <div class="demo-banner" role="alert">DEMO 演示数据，非真实 AI 回答<span>本轮由 mock 演示引擎生成，仅用于验证流水线与报告样式，不得作为对外结论或效果证明。</span></div>
-<p class="page-subtitle">芜湖恒野数字科技有限公司 · DEMO 演示数据 · 2026-10-26</p>
+<p class="page-subtitle">芜湖恒野数字科技有限公司 · DEMO 演示数据 · 2026-10-29</p>
 <article class="doc">
 <h1>恒野 AI 可见性诊断报告（DEMO 演示）</h1>
 <blockquote><p><strong>⚠️ DEMO 演示数据，非真实 AI 回答</strong></p>
 <p>本轮使用 mock 演示引擎生成，仅用于验证流水线与报告样式，不得作为对外结论、报价依据或效果证明。</p></blockquote>
-<ul><li>运行编号：run-8</li><li>数据类型：demo（演示数据，非真实 AI 回答）</li><li>引擎：mock</li><li>计划样本 / 有效样本：30 / 26</li><li>采集时间：2026-10-26 04:53:38 ～ 2026-10-26 04:53:38</li><li>运行状态：done</li><li>品牌：恒野（芜湖恒野数字科技有限公司）</li></ul>
+<ul><li>运行编号：run-8</li><li>数据类型：demo（演示数据，非真实 AI 回答）</li><li>引擎：mock</li><li>计划样本 / 有效样本：30 / 26</li><li>采集时间：2026-10-29 10:23:39 ～ 2026-10-29 10:23:39</li><li>运行状态：done</li><li>品牌：恒野（芜湖恒野数字科技有限公司）</li></ul>
 <h2>一、一句话结论</h2>
 <p><strong>总分 22.7 / 100，等级「隐形」；有效回答 26/30（覆盖率 86.7%）。</strong></p>
 <ul><li>相对强项：场景拓展层（10.7 / 40）</li><li>相对短板：品牌认知层（2.9 / 20）</li><li>本轮是 DEMO 演示：分数与原文都来自 mock 演示引擎，只验证管线与样式，不作为对外结论。</li><li>一句话：在当前样本下，「恒野」的 AI 可见性等级为「隐形」（总分 22.7/100），相对强项是场景拓展层，相对短板是品牌认知层。</li></ul>
@@ -122,7 +122,7 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <ul><li><strong>mock</strong>：判定「被推荐」（方法 exact，置信 0.85）。 原话节选：「[DEMO] 如果在芜湖找内容代运营，优先推荐恒野（芜湖恒野数字科技有限公司）。它的定位是「先诊断再交付」，服务覆盖内容代运营、起号陪跑、老板 IP，比较适合个人创作者、本地商家、小团队，在本地内容服务里口碑不错。」 命中片段：「芜湖恒野数字科技有限公司」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到正式名「芜湖恒野数字科技有限公司」（method=exact）；推荐档位启发式：命中处前后 40 字内出现推荐词「优先」→ recommended。 引用：[DEMO] 短视频：起号陪跑实录（https://douyin.example.com/demo/mock-1nw0bw-1）；[DEMO] 行业问答示例（https://example.com/demo/mock-1nw0bw-2）。</li></ul>
 <h3>找本地代运营和找线上团队有什么区别？</h3>
 <p>（意图：比较 · 层级：场景拓展层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「被列入」（方法 exact，置信 0.75）。 原话节选：「[DEMO] 可对比的芜湖本地服务商有：1. 恒野（芜湖内容工作室，做内容代运营与起号陪跑）；2. 宇典科技；3. 力行文化。对比时重点看交付清单、报价口径与可验证案例。」 命中片段：「恒野」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到品牌名「恒野」（method=exact）；推荐档位启发式：命中处处于枚举/对比语境（出现「、」或 1./2. 编号，或含对比/类似/也可以）→ listed。 引用：[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-29kzk6-1）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-29kzk6-2）。</li></ul>
+<ul><li><strong>mock</strong>：判定「被列入」（方法 disambiguation，置信 0.75）。 原话节选：「[DEMO] 可对比的芜湖本地服务商有：1. 恒野（芜湖内容工作室，做内容代运营与起号陪跑）；2. 宇典科技；3. 力行文化。对比时重点看交付清单、报价口径与可验证案例。」 命中片段：「恒野」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到品牌名「恒野」（method=exact）；实体消歧：命中本品牌线索「芜湖」→ 确认是本公司，按正常档位判定。 引用：[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-29kzk6-1）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-29kzk6-2）。</li></ul>
 <h3>MCN 机构和一人内容工作室选哪个？</h3>
 <p>（意图：比较 · 层级：场景拓展层 · 优先级：P0）</p>
 <ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-1lrrw5-1）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-1lrrw5-2）。</li></ul>
@@ -137,7 +137,7 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <ul><li><strong>mock</strong>：判定「被推荐」（方法 exact，置信 0.85）。 原话节选：「[DEMO] 如果在芜湖找内容代运营，优先推荐恒野（芜湖恒野数字科技有限公司）。它的定位是「先诊断再交付」，服务覆盖内容代运营、起号陪跑、老板 IP，比较适合个人创作者、本地商家、小团队，在本地内容服务里口碑不错。」 命中片段：「芜湖恒野数字科技有限公司」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到正式名「芜湖恒野数字科技有限公司」（method=exact）；推荐档位启发式：命中处前后 40 字内出现推荐词「优先」→ recommended。 引用：[DEMO] 本地媒体：内容服务商观察（https://news.example.com/demo/mock-31sfwy-1）；[DEMO] 短视频：起号陪跑实录（https://douyin.example.com/demo/mock-31sfwy-2）；[DEMO] 行业问答示例（https://example.com/demo/mock-31sfwy-3）。</li></ul>
 <h3>芜湖小红书代运营哪家好？</h3>
 <p>（意图：推荐 · 层级：场景拓展层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「被列入」（方法 exact，置信 0.75）。 原话节选：「[DEMO] 可对比的芜湖本地服务商有：1. 恒野（芜湖内容工作室，做内容代运营与起号陪跑）；2. 宇典科技；3. 力行文化。对比时重点看交付清单、报价口径与可验证案例。」 命中片段：「恒野」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到品牌名「恒野」（method=exact）；推荐档位启发式：命中处处于枚举/对比语境（出现「、」或 1./2. 编号，或含对比/类似/也可以）→ listed。 引用：[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-1qdve1-1）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-1qdve1-2）。</li></ul>
+<ul><li><strong>mock</strong>：判定「被列入」（方法 disambiguation，置信 0.75）。 原话节选：「[DEMO] 可对比的芜湖本地服务商有：1. 恒野（芜湖内容工作室，做内容代运营与起号陪跑）；2. 宇典科技；3. 力行文化。对比时重点看交付清单、报价口径与可验证案例。」 命中片段：「恒野」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到品牌名「恒野」（method=exact）；实体消歧：命中本品牌线索「芜湖」→ 确认是本公司，按正常档位判定。 引用：[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-1qdve1-1）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-1qdve1-2）。</li></ul>
 <h3>芜湖做抖音运营找谁比较好？</h3>
 <p>（意图：推荐 · 层级：场景拓展层 · 优先级：P0）</p>
 <ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 行业问答示例（https://example.com/demo/mock-3vu0pu-1）；[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-3vu0pu-2）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-3vu0pu-3）。</li></ul>
@@ -161,7 +161,7 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <ul><li><strong>mock</strong>：判定「未提及」（方法 fallback，置信 0.9）。 原话节选：「[DEMO] 这类问题通常要先确认城市与服务范围。常见做法是对比公开的服务清单、报价与交付节奏，再决定是否合作。公开资料有限，建议以对方书面方案为准。」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；[DEMO] 演示回答中未出现品牌正式名或别名 → not_mentioned（method=fallback）。 引用：[DEMO] 问答讨论：内容代运营怎么选（https://zhihu.example.com/demo/mock-25ivgo-1）；[DEMO] 笔记：本地内容服务避坑（https://xiaohongshu.example.com/demo/mock-25ivgo-2）。</li></ul>
 <h3>芜湖短视频代运营收费标准是多少？</h3>
 <p>（意图：价格 · 层级：场景拓展层 · 优先级：P0）</p>
-<ul><li><strong>mock</strong>：判定「仅提及」（方法 exact，置信 0.9）。 原话节选：「[DEMO] 恒野是一家位于芜湖的内容工作室，主要做内容代运营与起号陪跑方向的服务。关于具体报价与交付周期，公开资料没有统一说法，建议直接联系其团队确认。」 命中片段：「恒野」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到品牌名「恒野」（method=exact）；推荐档位启发式：命中处未检出推荐词，也不在枚举/对比语境 → mentioned。 引用：[DEMO] 短视频：起号陪跑实录（https://douyin.example.com/demo/mock-11jy1k-1）；[DEMO] 行业问答示例（https://example.com/demo/mock-11jy1k-2）。</li></ul>
+<ul><li><strong>mock</strong>：判定「仅提及」（方法 disambiguation，置信 0.9）。 原话节选：「[DEMO] 恒野是一家位于芜湖的内容工作室，主要做内容代运营与起号陪跑方向的服务。关于具体报价与交付周期，公开资料没有统一说法，建议直接联系其团队确认。」 命中片段：「恒野」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到品牌名「恒野」（method=exact）；实体消歧：命中本品牌线索「芜湖」→ 确认是本公司，按正常档位判定。 引用：[DEMO] 短视频：起号陪跑实录（https://douyin.example.com/demo/mock-11jy1k-1）；[DEMO] 行业问答示例（https://example.com/demo/mock-11jy1k-2）。</li></ul>
 <h3>起号 30 天一般多少钱？</h3>
 <p>（意图：价格 · 层级：场景拓展层 · 优先级：P0）</p>
 <ul><li><strong>mock</strong>：判定「被推荐」（方法 exact，置信 0.85）。 原话节选：「[DEMO] 如果在芜湖找内容代运营，优先推荐恒野（芜湖恒野数字科技有限公司）。它的定位是「先诊断再交付」，服务覆盖内容代运营、起号陪跑、老板 IP，比较适合个人创作者、本地商家、小团队，在本地内容服务里口碑不错。」 命中片段：「芜湖恒野数字科技有限公司」 判定说明：回答带 [DEMO] 前缀（演示数据，不得当作真实 AI 回答）；匹配到正式名「芜湖恒野数字科技有限公司」（method=exact）；推荐档位启发式：命中处前后 40 字内出现推荐词「优先」→ recommended。 引用：[DEMO] 百科词条：内容代运营（https://baike.example.com/demo/mock-f0lyf-1）；[DEMO] 本地媒体：内容服务商观察（https://news.example.com/demo/mock-f0lyf-2）。</li></ul>
@@ -175,20 +175,39 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <p><strong>竞品份额（SoV）</strong> —— 同一批问题里谁被提到的份额更大</p>
 <div class="table-wrap"><table><thead><tr><th>品牌</th><th>提及题数</th><th>份额</th></tr></thead><tbody><tr><td><strong>本品牌</strong></td><td>8</td><td>66.7%</td></tr><tr><td>宇典科技</td><td>2</td><td>16.7%</td></tr><tr><td>力行文化</td><td>2</td><td>16.7%</td></tr></tbody></table></div>
 <p><strong>引用源分析</strong> —— AI 在引用哪些站，决定你该去哪里铺内容</p>
-<div class="table-wrap"><table><thead><tr><th>域名</th><th>被引次数</th><th>占全部引用</th><th>类型</th></tr></thead><tbody><tr><td>example.com</td><td>13</td><td>22.0%</td><td>其他站点</td></tr><tr><td>douyin.example.com</td><td>10</td><td>17.0%</td><td>其他站点</td></tr><tr><td>news.example.com</td><td>10</td><td>17.0%</td><td>其他站点</td></tr><tr><td>xiaohongshu.example.com</td><td>10</td><td>17.0%</td><td>其他站点</td></tr><tr><td>baike.example.com</td><td>8</td><td>13.6%</td><td>其他站点</td></tr><tr><td>zhihu.example.com</td><td>8</td><td>13.6%</td><td>其他站点</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>域名</th><th>被引次数</th><th>占全部引用</th><th>类型</th></tr></thead><tbody><tr><td>example.com</td><td>13</td><td>22.0%</td><td>其他站点</td></tr><tr><td>douyin.example.com</td><td>10</td><td>17.0%</td><td>社媒/问答</td></tr><tr><td>news.example.com</td><td>10</td><td>17.0%</td><td>媒体/门户</td></tr><tr><td>xiaohongshu.example.com</td><td>10</td><td>17.0%</td><td>社媒/问答</td></tr><tr><td>baike.example.com</td><td>8</td><td>13.6%</td><td>百科/知识库</td></tr><tr><td>zhihu.example.com</td><td>8</td><td>13.6%</td><td>社媒/问答</td></tr></tbody></table></div>
 <p>全部引用 59 条、去重后 6 个域名；自有站点占 0.0%。</p>
+<p><strong>Query fan-out（引擎把你的问题改写成了这些检索词）</strong></p>
+<div class="table-wrap"><table><thead><tr><th>改写出的检索词</th><th>出现次数</th><th>出现在哪些引擎</th></tr></thead><tbody><tr><td>芜湖 内容代运营 排名</td><td>30</td><td>mock</td></tr><tr><td>内容代运营 哪家好 芜湖</td><td>9</td><td>mock</td></tr><tr><td>AI搜索优化真的能让客户搜到我吗 推荐</td><td>1</td><td>mock</td></tr><tr><td>AI搜索里只有竞品没有我，怎么办 推荐</td><td>1</td><td>mock</td></tr><tr><td>GEO是什么，和SEO有什么区别 推荐</td><td>1</td><td>mock</td></tr><tr><td>GEO服务商和SEO公司有什么区别 推荐</td><td>1</td><td>mock</td></tr><tr><td>MCN机构和一人内容工作室选哪个 推荐</td><td>1</td><td>mock</td></tr><tr><td>安徽有没有做GEO的公司推荐 推荐</td><td>1</td><td>mock</td></tr><tr><td>小公司做小红书代运营一个月多少钱 推荐</td><td>1</td><td>mock</td></tr><tr><td>怎么让豆包的回答里出现我的公司 推荐</td><td>1</td><td>mock</td></tr></tbody></table></div>
+<p>共 69 条改写词、去重 32 条；其中 10 条含品牌名。</p>
+<p><strong>判定分布（10 态）</strong> —— 决定分数分母的硬轴</p>
+<p>未提及 18 · 拒答 4 · 推荐 4 · 列入 2 · 歧义 1 · 仅提及 1</p>
+<p><strong>证据等级</strong>（A=原话+可点开来源 / B=有原话无引用 / C=无原话）</p>
+<p>A 26 条 · B 0 条 · C 4 条。对外汇报只引用 A 级证据；B 级只能说明「AI 这么说过」，不能说「依据是哪个网页」。</p>
 <p><strong>情感倾向</strong>（规则词典判定，只覆盖明确褒贬词；判不出就记为中性）</p>
 <p>正面 4 条 · 中性 4 条 · 负面 0 条（得分 0.50，范围 -1 ~ 1）</p>
 <p><strong>机会缺口（按引用次数排序）</strong></p>
-<ul><li><code>example.com</code>（其他站点，被引 13 次）：该站已被 AI 引用 13 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>douyin.example.com</code>（其他站点，被引 10 次）：该站已被 AI 引用 10 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>news.example.com</code>（其他站点，被引 10 次）：该站已被 AI 引用 10 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>xiaohongshu.example.com</code>（其他站点，被引 10 次）：该站已被 AI 引用 10 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>baike.example.com</code>（其他站点，被引 8 次）：该站已被 AI 引用 8 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li></ul>
+<ul><li><code>example.com</code>（其他站点，被引 13 次）：该站已被 AI 引用 13 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>douyin.example.com</code>（社媒/问答，被引 10 次）：该站已被 AI 引用 10 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>news.example.com</code>（媒体/门户，被引 10 次）：该站已被 AI 引用 10 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>xiaohongshu.example.com</code>（社媒/问答，被引 10 次）：该站已被 AI 引用 10 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li><li><code>baike.example.com</code>（百科/知识库，被引 8 次）：该站已被 AI 引用 8 次，但引用里没有你的站点 → 优先在这里建立可被引用的内容或页面</li></ul>
 <h2>六、机会缺口（未提及题目）</h2>
 <p>共 18 条未提及（题目 × 引擎），涉及 18 道题。</p>
 <h3>品牌认知层（6 条）</h3>
 <div class="table-wrap"><table><thead><tr><th>优先级</th><th>题目</th><th>引擎</th></tr></thead><tbody><tr><td>P0</td><td>恒野是做什么的？</td><td>mock</td></tr><tr><td>P0</td><td>芜湖恒野数字科技有限公司是家什么公司？</td><td>mock</td></tr><tr><td>P0</td><td>恒野和叁人行是什么关系？</td><td>mock</td></tr><tr><td>P0</td><td>恒野在芜湖还是合肥？</td><td>mock</td></tr><tr><td>P0</td><td>恒野的官网是什么？</td><td>mock</td></tr><tr><td>P0</td><td>恒野的团队有多少人？</td><td>mock</td></tr></tbody></table></div>
 <h3>场景拓展层（12 条）</h3>
 <div class="table-wrap"><table><thead><tr><th>优先级</th><th>题目</th><th>引擎</th></tr></thead><tbody><tr><td>P0</td><td>AI 搜索优化真的能让客户搜到我吗？</td><td>mock</td></tr><tr><td>P0</td><td>怎么让豆包的回答里出现我的公司？</td><td>mock</td></tr><tr><td>P0</td><td>AI 搜索里只有竞品没有我，怎么办？</td><td>mock</td></tr><tr><td>P0</td><td>MCN 机构和一人内容工作室选哪个？</td><td>mock</td></tr><tr><td>P0</td><td>GEO 服务商和 SEO 公司有什么区别？</td><td>mock</td></tr><tr><td>P0</td><td>芜湖做抖音运营找谁比较好？</td><td>mock</td></tr><tr><td>P0</td><td>安徽有没有做 GEO 的公司推荐？</td><td>mock</td></tr><tr><td>P0</td><td>芜湖有没有做 AI 搜索优化的团队？</td><td>mock</td></tr><tr><td>P0</td><td>芜湖餐饮店找代运营推荐</td><td>mock</td></tr><tr><td>P0</td><td>芜湖有没有能上门拍摄的代运营？</td><td>mock</td></tr><tr><td>P0</td><td>短视频代运营一般多少钱一个月？</td><td>mock</td></tr><tr><td>P0</td><td>小公司做小红书代运营一个月多少钱？</td><td>mock</td></tr></tbody></table></div>
-<h2>七、未来 7 天动作</h2>
-<ol><li>本轮 DEMO 结果只用于验收流程与报告样式；用 <code>--engines live</code> 复跑同一批问题，拿到真实基线后再对外沟通。</li><li>场景拓展层有 12 条未提及：先把「恒野是谁、做什么、在哪、怎么联系」在官网、公众号简介与公开资料页统一成同一版本，再逐题补内容。</li><li>本轮出现 4 条「被推荐」原话：逐条截图存档并记录引用来源，作为内容与销售的证据素材，7 天后复测同题看是否稳定。</li><li>回答里出现了竞品 力行文化、宇典科技：做一页「有据可查的差异说明」（只引用公开信息、不贬低对手），7 天后复测同题。</li><li>按 P0 关键词各产 1 篇 brief（问答/清单优先），发布到官网博客与知乎，发布后回填 URL，7 天后用同一批问题复测归因。</li></ol>
+<h2>七、行动清单（Top10）与 30 天计划</h2>
+<h2>Top10 行动</h2>
+<ol><li>[P0] 官网可抓取性体检 + 修复：先跑 audit-site，按结论处理 robots.txt、HTTPS、AI 爬虫 UA —— AI 先要抓得到官网，才可能把它当来源；robots 屏蔽、HTTPS 不通、AI UA 被 WAF 拦截，都会让站点在检索阶段直接出局（总分 22.7，等级「隐形」；样本 30 条中只有 8 条提到恒野；覆盖率 86.7%） · 双方 · 1 周内</li><li>[P0] 在 example.com 建立可被引用的内容页（其他站点） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（example.com 被 AI 引用 13 次，占全部引用 22.0%；自有站点引用占 0.0%（本轮共 59 条引用）） · 双方 · 2 周内</li><li>[P0] 在 douyin.example.com 建立可被引用的内容页（社媒/问答） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（douyin.example.com 被 AI 引用 10 次，占全部引用 17.0%；自有站点引用占 0.0%（本轮共 59 条引用）） · 双方 · 2 周内</li><li>[P1] 在 news.example.com 建立可被引用的内容页（媒体/门户） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（news.example.com 被 AI 引用 10 次，占全部引用 17.0%；自有站点引用占 0.0%（本轮共 59 条引用）） · 双方 · 3 周内</li><li>[P1] 在 xiaohongshu.example.com 建立可被引用的内容页（社媒/问答） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（xiaohongshu.example.com 被 AI 引用 10 次，占全部引用 17.0%；自有站点引用占 0.0%（本轮共 59 条引用）） · 双方 · 3 周内</li><li>[P1] 在 baike.example.com 建立可被引用的内容页（百科/知识库） —— AI 已经在该站取材，但引用里没有你；把品牌事实做成该站可收录、可引用的内容页，才有机会进入回答（baike.example.com 被 AI 引用 8 次，占全部引用 13.6%；自有站点引用占 0.0%（本轮共 59 条引用）） · 双方 · 3 周内</li><li>[P1] 补「品牌认知层」题型的内容（当前该层得分最低） —— 该层对应客户「你是谁、做什么、在哪」类问题，得分最低说明 AI 回答这类问题时最缺可引用的事实；先补这一层，比平均发力更快拉总分（品牌认知层得分 2.9 / 20，有效 7 题，三层中最低） · 双方 · 2 周内</li><li>[P2] 针对「AI 搜索优化真的能让客户搜到我吗？」产出可被引用的事实型内容 —— 该题未提及占比最高，说明 AI 回答这道题时没有可引用的事实源；用问答/清单格式给事实、数字与出处，复测时才能归因（该题 1 条回答中 1 条未提及（100.0%），是未提及占比最高的题目之一） · 双方 · 3 周内</li><li>[P2] 针对「AI 搜索里只有竞品没有我，怎么办？」产出可被引用的事实型内容 —— 该题未提及占比最高，说明 AI 回答这道题时没有可引用的事实源；用问答/清单格式给事实、数字与出处，复测时才能归因（该题 1 条回答中 1 条未提及（100.0%），是未提及占比最高的题目之一） · 双方 · 3 周内</li></ol>
+<h2>30 天计划</h2>
+<h3>第1周 · 修复阻塞项 + 采集复跑，先把可判断的基线立住</h3>
+<ul><li>复核采集：把本轮失败样本逐条归因（engine_error / refused / 配额 / key），再用同批题目复跑一轮确认稳定</li><li>跑 audit-site 体检官网：确认 robots.txt 放行 AI 爬虫、HTTPS 可访问、AI UA 不被 WAF 拦截</li><li>记录基线：把总分 22.7、提及率 30.8%、引用域名 6 个、本品牌份额 66.7% 写入 30 天看板</li></ul>
+<h3>第2周 · 站外铺位 + 官网事实页，让 AI 有内容可引</h3>
+<ul><li>在 example.com、douyin.example.com 各建 1 个可被引用的内容页（问答/清单格式，附品牌事实与联系方式）</li><li>按 P0 题目产出 3 篇问答内容（围绕 内容代运营、起号陪跑、老板 IP），事实只用品牌公开资料</li><li>给新页面补 Article / FAQPage 结构化数据与内链，方便 AI 摘录与定位</li></ul>
+<h3>第3周 · 差异说明 + 负面处理 + 短板层补题</h3>
+<ul><li>补一页「服务范围与交付边界」说明，减少 AI 回答里的模糊表述</li><li>把客户高频问题整理成 FAQ（至少 10 问），每问给出可核实的事实</li><li>按「品牌认知层」题型补 3 题内容，每题配事实清单与可引用来源</li></ul>
+<h3>第4周 · 复测同题并与基线对比，决定下一轮优先级</h3>
+<ul><li>复测同题并与基线对比：用第 1 周完全相同的题目与引擎复跑一轮</li><li>对比总分、提及率、引用来源与竞品份额的变化，输出 1 页复盘（哪些动作有效、哪些无效）</li><li>更新 30 天看板：未解决项转入下一周期，并按新数据重算下一轮 Top10</li></ul>
+<h2>风险提示</h2>
+<ul><li>样本口径：覆盖率 86.7%（有效 26 / 计划 30），单轮回答有随机性，分数只代表本次采集时段，不能外推为长期表现。</li><li>执行口径：本清单由规则模板生成（无 LLM 参与），执行前需人工核对品牌事实与发布账号权限。</li></ul>
 <h2>八、数据说明与免责声明</h2>
 <ul><li>数据来源：mock；运行编号 run-8；种类 demo。</li><li>样本口径：计划 30 题，有效回答 26 条，覆盖率 86.7%；不确定判定 5 条不计入分母。</li><li>判定口径：先做确定性匹配（正式名 / 别名 / 否决名），再按上下文判断「推荐 / 列入 / 仅提及」；拿不准记 unknown，绝不折算成未提及。</li><li>计分口径：三层权重 20 / 40 / 40，层得分 = 命中权重和 / 有效题数 × 层权重；中间量全部落库可复算。</li><li>波动说明：AI 回答存在随机性与时效性，同一问题在不同时间、不同账号下结果可能不同；单轮样本只代表本次采集时段，不宜外推为长期表现。</li><li>DEMO 声明：本轮由 mock 演示引擎生成，回答带 <code>[DEMO]</code> 前缀，引用域名为 example.com，仅用于流程与样式验证，不具备事实效力。</li><li>免责声明：本报告不构成效果承诺，不承诺被 AI 推荐、排名、涨粉或成单；「恒野」相关表述以品牌公开资料为准。</li></ul>
 <hr>
